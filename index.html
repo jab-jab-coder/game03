@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Barman – gra</title>
+  <meta name="description" content="Zręcznościowa gra w barmana: obsłuż klientów szybko i bezbłędnie.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main id="wrap">
+    <div id="stage">
+      <canvas id="game" width="1280" height="720" aria-label="Plansza gry – bar"></canvas>
+
+      <div id="overlay" class="overlay">
+        <section class="panel active" id="panel-menu">
+          <h1>Barman</h1>
+          <p class="sub">Edycja 1</p>
+          <p>Klienci podchodzą do baru i zamawiają drinki. Podejdź do właściwej butelki, weź ją
+            i podaj klientowi, zanim straci cierpliwość. Piwo nalewasz z kranu na końcu baru.
+            Liczy się <b>czas</b> i <b>trafność</b> zamówień!</p>
+          <table class="keys">
+            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>ruch za barem</td></tr>
+            <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>wybór półki (górna / środkowa / dolna)</td></tr>
+            <tr><td><kbd>Spacja</kbd></td><td>weź butelkę / nalej piwo / podaj klientowi</td></tr>
+            <tr><td><kbd>X</kbd></td><td>odłóż to, co trzymasz</td></tr>
+            <tr><td><kbd>P</kbd> <kbd>M</kbd></td><td>pauza / dźwięk</td></tr>
+          </table>
+          <button class="btn" data-start>Zacznij zmianę</button>
+          <p class="best">Rekord: <span class="best-val">0</span></p>
+        </section>
+
+        <section class="panel" id="panel-pause">
+          <h2>Pauza</h2>
+          <button class="btn" id="btn-resume">Wznów</button>
+        </section>
+
+        <section class="panel" id="panel-over">
+          <h2>Koniec zmiany</h2>
+          <p class="big">Punkty: <b id="over-score">0</b></p>
+          <p>Obsłużeni klienci: <b id="over-served">0</b> · Poziom: <b id="over-level">1</b></p>
+          <p class="best">Rekord: <span class="best-val">0</span> <span id="over-newbest" class="newbest"></span></p>
+          <button class="btn" data-start>Zagraj ponownie</button>
+        </section>
+      </div>
+    </div>
+
+    <div id="touch" aria-label="Sterowanie dotykowe">
+      <button data-act="left">◀</button>
+      <button data-act="up">▲</button>
+      <button data-act="down">▼</button>
+      <button data-act="right">▶</button>
+      <button data-act="use" class="wide">WEŹ / PODAJ</button>
+      <button data-act="drop">ODŁÓŻ</button>
+    </div>
+
+    <p class="help">← → ruch · ↑ ↓ półka · Spacja: weź / podaj · X: odłóż · P: pauza · M: dźwięk</p>
+  </main>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
