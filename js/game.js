@@ -170,7 +170,7 @@
     time: 0,
     score: 0, lives: MAX_LIVES, level: 1, served: 0, streak: 0, bestStreak: 0,
     best: loadBest(),
-    spawnT: 0, overDelay: 0,
+    spawnT: 0, overDelay: 0, overTime: 0,
     customers: [], floats: [], toast: null,
     bt: null,
   };
@@ -325,6 +325,7 @@
 
   function endGame() {
     S.mode = 'over';
+    S.overTime = S.time;
     const newBest = S.score > S.best;
     if (newBest) { S.best = S.score; saveBest(S.best); }
     document.getElementById('over-score').textContent = S.score;
@@ -834,13 +835,17 @@
     // ściana za barmanem
     g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, cy + ch + 12, W, wallBottom - (cy + ch + 12));
 
-    // neon
+    // szyld PSOTA – złote litery
     g.save();
-    g.font = `900 70px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.shadowColor = '#ff2d95'; g.shadowBlur = 34;
-    g.strokeStyle = '#ff5fbf'; g.lineWidth = 6; g.strokeText('BAR', 1140, 100);
-    g.shadowBlur = 12; g.strokeText('BAR', 1140, 100);
-    g.shadowBlur = 0; g.strokeStyle = '#ffd6f0'; g.lineWidth = 2; g.strokeText('BAR', 1140, 100);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    fitFont(g, 'PSOTA', 236, 66, 900);
+    const gold = g.createLinearGradient(0, 70, 0, 130);
+    gold.addColorStop(0, '#fff4b8'); gold.addColorStop(0.45, '#f5c542');
+    gold.addColorStop(0.55, '#b8860b'); gold.addColorStop(1, '#ffe08a');
+    g.shadowColor = 'rgba(255,190,60,.75)'; g.shadowBlur = 24;
+    g.fillStyle = gold; g.fillText('PSOTA', 1140, 100);
+    g.shadowBlur = 0;
+    g.lineWidth = 1.5; g.strokeStyle = '#6b4a08'; g.strokeText('PSOTA', 1140, 100);
     g.restore();
 
     // tablica kredowa
@@ -936,6 +941,7 @@
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     S.time += dt;
+    pollGamepad(dt);
     if (S.mode === 'playing') update(dt);
     render();
     requestAnimationFrame(frame);
@@ -956,17 +962,67 @@
     KeyP: 'pause', Escape: 'pause', KeyM: 'mute',
   };
 
+  // Wspólna obsługa akcji z klawiatury i gamepada
+  function action(a, repeat) {
+    if (a === 'mute') { if (!repeat) { const m = sfx.toggle(); toast(m ? 'Dźwięk wyłączony' : 'Dźwięk włączony'); } return; }
+    if (S.mode === 'menu' || S.mode === 'over') {
+      // po końcu gry chwila przerwy, żeby nie zrestartować przypadkiem
+      if (S.mode === 'over' && S.time - S.overTime < 1) return;
+      if ((a === 'use' || a === 'pause') && !repeat) startGame();
+      return;
+    }
+    if (a === 'pause') { if (!repeat) togglePause(); return; }
+    if (S.mode === 'paused') { if (a === 'use' && !repeat) togglePause(); return; }
+    if (repeat && (a === 'use' || a === 'drop')) return;
+    input(a);
+  }
+
   window.addEventListener('keydown', e => {
     const a = KEYMAP[e.code];
     if (!a) return;
     e.preventDefault();
-    if (a === 'mute') { const m = sfx.toggle(); toast(m ? 'Dźwięk wyłączony' : 'Dźwięk włączony'); return; }
-    if (S.mode === 'menu' || S.mode === 'over') { if (a === 'use' && !e.repeat) startGame(); return; }
-    if (a === 'pause') { if (!e.repeat) togglePause(); return; }
-    if (S.mode === 'paused') { if (a === 'use' && !e.repeat) togglePause(); return; }
-    if (e.repeat && (a === 'use' || a === 'drop')) return;
-    input(a);
+    action(a, e.repeat);
   });
+
+  // ===================== Gamepad =====================
+  // Standardowe mapowanie: 0=A, 1=B, 2=X, 8=Select/Back, 9=Start, 12-15=krzyżak.
+  const pad = { prev: {}, holdDir: null, holdT: 0 };
+  const PAD_REPEAT_DELAY = 0.3, PAD_REPEAT_RATE = 0.11, STICK = 0.5;
+
+  function pollGamepad(dt) {
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    let gp = null;
+    for (const p of list) if (p && p.connected) { gp = p; break; }
+    if (!gp) { pad.prev = {}; pad.holdDir = null; return; }
+
+    const btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    const cur = {
+      left: btn(14) || ax < -STICK,
+      right: btn(15) || ax > STICK,
+      up: btn(12) || ay < -STICK,
+      down: btn(13) || ay > STICK,
+      use: btn(0),
+      drop: btn(1) || btn(2),
+      pause: btn(9),
+      mute: btn(8),
+    };
+    for (const a in cur) if (cur[a] && !pad.prev[a]) action(a, false);
+
+    // przytrzymanie w lewo/prawo – automatyczne powtarzanie ruchu
+    const dir = cur.left ? 'left' : cur.right ? 'right' : null;
+    if (dir && dir === pad.holdDir) {
+      pad.holdT -= dt;
+      if (pad.holdT <= 0) { action(dir, true); pad.holdT = PAD_REPEAT_RATE; }
+    } else {
+      pad.holdDir = dir;
+      pad.holdT = PAD_REPEAT_DELAY;
+    }
+    pad.prev = cur;
+  }
+
+  window.addEventListener('gamepadconnected', e => toast(`Gamepad podłączony: ${e.gamepad.id.split('(')[0].trim() || 'kontroler'}`));
+  window.addEventListener('gamepaddisconnected', () => toast('Gamepad odłączony'));
 
   document.querySelectorAll('[data-start]').forEach(btn => btn.addEventListener('click', e => { e.currentTarget.blur(); startGame(); }));
   document.getElementById('btn-resume').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });

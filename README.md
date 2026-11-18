@@ -17,6 +17,19 @@ bezpośrednio na GitHub Pages, a nawet po dwukrotnym kliknięciu `index.html`.
 | `P` / `Esc` | pauza |
 | `M` | dźwięk wł./wył. |
 
+### Gamepad
+
+Działa każdy kontroler obsługiwany przez przeglądarkę (Gamepad API, standardowe mapowanie: Xbox, PlayStation, większość padów USB/Bluetooth).
+Po podłączeniu naciśnij dowolny przycisk na padzie, żeby przeglądarka go wykryła.
+
+| Przycisk | Akcja |
+|---|---|
+| krzyżak / lewa gałka | ruch (przytrzymanie = ciągły ruch) i wybór półki |
+| `A` (✕ na PlayStation) | weź · nalej · podaj · start gry |
+| `B` / `X` (○ / □) | odłóż |
+| `Start` | pauza / start gry |
+| `Select` / `Back` | dźwięk wł./wył. |
+
 Na telefonie pod planszą pojawiają się przyciski dotykowe.
 
 ## Zasady
