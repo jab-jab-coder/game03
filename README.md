@@ -6,6 +6,18 @@ jak najszybciej podać im właściwą butelkę albo piwo z kranu.
 Czysty HTML + CSS + JavaScript (Canvas), **bez zależności i bez budowania**, więc działa
 bezpośrednio na GitHub Pages, a nawet po dwukrotnym kliknięciu `index.html`.
 
+## Bary do wyboru
+
+W menu wybierasz planszę (kliknięciem, strzałkami ← → albo padem). Wybór zapamiętuje się w przeglądarce.
+
+- **Bar klasyczny:** ceglana ściana, szafa z lustrem, złoty szyld PSOTA, chromowany kran.
+- **PSOTA:** odwzorowanie prawdziwego baru: korkowy sufit z belkami, siatką i lampkami, złote litery
+  z pogniecionej folii wśród liści, tęczowa flaga i kwiaty, podświetlana drewniana szafa z gęsto
+  ustawionymi butelkami, kafle, automat do shotów, kosze z cytrusami, kartonowe tabliczki, zielone
+  tabliczki o sprzedaży alkoholu, miedziany kran z gałką „IPA” i czarny blat z matami.
+
+W pauzie i po końcu gry przycisk **Menu / Zmień bar** wraca do wyboru planszy.
+
 ## Sterowanie
 
 | Klawisz | Akcja |

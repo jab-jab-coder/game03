@@ -22,7 +22,9 @@
   const COL_X = COLUMNS.map(c => c.x);
   const SEATS = [0, 2, 4, 6, 8, 10];   // kolumny, przy których stają klienci
   const TAP_X = 1192;
-  const SHELF_Y = [140, 250, 360]; // górna, środkowa, dolna (y deski)
+  // Zależne od wybranego baru (motywu) – ustawiane w applyTheme()
+  let SHELF_Y = [140, 250, 360]; // górna, środkowa, dolna (y deski)
+  let BOTTLE_S = 1;              // skala butelek na półkach
   const SHELF_LEFT = 228, SHELF_RIGHT = 994;
   const BAR_TOP = 482, BAR_LIP = 500, BAR_FRONT = 512, BAR_BOTTOM = 625;
   const GLASS_BASE = 496;
@@ -760,7 +762,7 @@
     if (b.pick) {
       const it = b.pick.it, k = easeOut(b.pick.t / PICK_TIME);
       const px = lerp(COL_X[it.col], R.x, k), py = lerp(SHELF_Y[it.shelf], R.y + 14, k);
-      drawHeldItem(g, it, px, py, lerp(1, 0.62, k));
+      drawHeldItem(g, it, px, py, lerp(BOTTLE_S, 0.62, k));
     } else if (hasShaker) {
       drawShaker(g, shakerPos.x, shakerPos.y, 0.72, b.shaker);
     } else if (b.holding) {
@@ -781,25 +783,51 @@
     g.strokeStyle = '#55565b'; g.lineWidth = 1;
     for (let i = -28; i <= 28; i += 7) { g.beginPath(); g.moveTo(x + i, 488); g.lineTo(x + i, 495); g.stroke(); }
 
-    // wieża
-    const gr = g.createLinearGradient(x - 14, 0, x + 14, 0);
-    gr.addColorStop(0, '#6d757c'); gr.addColorStop(0.45, '#eef3f6'); gr.addColorStop(1, '#7a8288');
-    g.fillStyle = gr;
-    rr(g, x - 13, 404, 26, 84, 4); g.fill();
-    rr(g, x - 20, 396, 40, 12, 4); g.fill();
-    rr(g, x - 4, 416, 8, 24, 3); g.fill();
-    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
-    rr(g, x - 13, 404, 26, 84, 4); g.stroke();
+    if (THEME.tap === 'copper') {
+      // miedziana wieża (bar PSOTA)
+      const gr = g.createLinearGradient(x - 22, 0, x + 22, 0);
+      gr.addColorStop(0, '#5e301a'); gr.addColorStop(0.4, '#eeb08a'); gr.addColorStop(0.6, '#c98058'); gr.addColorStop(1, '#6b3820');
+      g.fillStyle = gr;
+      rr(g, x - 21, 380, 42, 108, 16); g.fill();
+      g.beginPath(); g.ellipse(x, 384, 21, 7, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; rr(g, x - 21, 380, 42, 108, 16); g.stroke();
+      // naklejki
+      const hg = g.createLinearGradient(x - 14, 440, x + 2, 456);
+      hg.addColorStop(0, '#9be7ff'); hg.addColorStop(0.5, '#e3b5ff'); hg.addColorStop(1, '#b7ffcf');
+      g.fillStyle = hg; g.beginPath(); g.arc(x - 7, 458, 9, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#c0182b'; g.beginPath(); g.arc(x + 9, 470, 6, 0, Math.PI * 2); g.fill();
+      // wylewka
+      g.fillStyle = '#c98058'; rr(g, x - 4, 416, 8, 24, 3); g.fill();
+      // rączka z czarną okrągłą plakietką „IPA”
+      g.save();
+      g.translate(x, 410);
+      g.rotate(pouring ? -0.42 : 0);
+      g.fillStyle = '#1a1a1a'; rr(g, -4, -46, 8, 46, 3); g.fill();
+      g.fillStyle = '#111'; g.beginPath(); g.arc(0, -56, 17, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#c9a227'; g.lineWidth = 1.5; g.beginPath(); g.arc(0, -56, 14, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = '#f3e3c3'; g.font = `800 10px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('IPA', 0, -55);
+      g.restore();
+    } else {
+      // chromowana wieża (bar klasyczny)
+      const gr = g.createLinearGradient(x - 14, 0, x + 14, 0);
+      gr.addColorStop(0, '#6d757c'); gr.addColorStop(0.45, '#eef3f6'); gr.addColorStop(1, '#7a8288');
+      g.fillStyle = gr;
+      rr(g, x - 13, 404, 26, 84, 4); g.fill();
+      rr(g, x - 20, 396, 40, 12, 4); g.fill();
+      rr(g, x - 4, 416, 8, 24, 3); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
+      rr(g, x - 13, 404, 26, 84, 4); g.stroke();
 
-    // rączka
-    g.save();
-    g.translate(x, 398);
-    g.rotate(pouring ? -0.42 : 0);
-    g.fillStyle = '#1a1a1a'; rr(g, -8, -62, 16, 60, 6); g.fill();
-    g.fillStyle = '#f2b01e'; rr(g, -6, -56, 12, 34, 3); g.fill();
-    g.fillStyle = '#3a2208'; g.font = `800 8px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    ['P', 'I', 'W', 'O'].forEach((ch, i) => g.fillText(ch, 0, -51 + i * 8));
-    g.restore();
+      g.save();
+      g.translate(x, 398);
+      g.rotate(pouring ? -0.42 : 0);
+      g.fillStyle = '#1a1a1a'; rr(g, -8, -62, 16, 60, 6); g.fill();
+      g.fillStyle = '#f2b01e'; rr(g, -6, -56, 12, 34, 3); g.fill();
+      g.fillStyle = '#3a2208'; g.font = `800 8px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      ['P', 'I', 'W', 'O'].forEach((ch, i) => g.fillText(ch, 0, -51 + i * 8));
+      g.restore();
+    }
 
     if (pouring) {
       const k = 1 - b.busy / POUR_TIME, s = 0.8;
@@ -820,7 +848,10 @@
     const kind = COLUMNS[b.col].kind;
     const x = COL_X[b.col];
     let box = null;
-    if (layer === 'shelf' && kind === 'shelf') box = [x - 44, SHELF_Y[b.sel] - 102, 88, 104];
+    if (layer === 'shelf' && kind === 'shelf') {
+      const bw = BOTTLE_S < 1 ? 76 : 88, bh = 104 * BOTTLE_S;
+      box = [x - bw / 2, SHELF_Y[b.sel] - bh + 2, bw, bh];
+    }
     if (layer === 'bar') {
       if (kind === 'tap' && !withShaker) box = [TAP_X - 28, 326, 56, 176];
       if (kind === 'shaker' && !withShaker) box = [x - 28, 410, 56, 92];
@@ -1006,7 +1037,7 @@
     g.fillRect(x - 12, by - 4, 24, 4);
   }
 
-  function buildBackground() {
+  function buildBgClassic() {
     const L = layer(), g = L.getContext('2d');
     const rnd = mulberry32(42);
     const wallBottom = BAR_TOP + 30;
@@ -1116,7 +1147,7 @@
     return L;
   }
 
-  function buildBar() {
+  function buildBarClassic() {
     const L = layer(), g = L.getContext('2d');
     // podłoga
     let gr = g.createLinearGradient(0, BAR_BOTTOM, 0, H);
@@ -1163,11 +1194,430 @@
     return L;
   }
 
-  const BG = buildBackground();
-  const BAR = buildBar();
+  // =====================================================================
+  // ===================== Bar „PSOTA” (wg zdjęcia) =======================
+  // =====================================================================
+  const PS = {
+    shelfY: [230, 310, 388],
+    cab: { x0: 214, y0: 156, x1: 1008, y1: 322 },
+    ceilingH: 76,
+    counterY: 468,
+  };
+  const LEAF_COLORS = ['#5fa98a', '#8fd1b4', '#3d7f63', '#a9dcc3', '#2f6b52', '#6fbf9b', '#c4e8d4', '#447a3a'];
+
+  function psLeaf(g, x, y, len, ang, col) {
+    g.save();
+    g.translate(x, y); g.rotate(ang);
+    g.fillStyle = col;
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(len * 0.5, -len * 0.3, len, 0);
+    g.quadraticCurveTo(len * 0.5, len * 0.3, 0, 0);
+    g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(len * 0.05, 0); g.lineTo(len * 0.9, 0); g.stroke();
+    g.restore();
+  }
+  function psMaple(g, x, y, r, ang, col) {
+    g.save();
+    g.translate(x, y); g.rotate(ang);
+    g.fillStyle = col;
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2, rr2 = i % 2 ? r * 0.45 : r;
+      g.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2);
+    }
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * r * 0.85, Math.sin(a) * r * 0.85); g.stroke();
+    }
+    g.restore();
+  }
+  function psFoliage(g, rnd, cx, cy, rx, ry, n, scale = 1) {
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd());
+      const x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d;
+      const col = LEAF_COLORS[Math.floor(rnd() * LEAF_COLORS.length)];
+      if (rnd() < 0.35) psMaple(g, x, y, (9 + rnd() * 9) * scale, rnd() * 6, col);
+      else psLeaf(g, x, y, (18 + rnd() * 26) * scale, rnd() * Math.PI * 2, col);
+    }
+  }
+  function psPompom(g, rnd, x, y, r, c1, c2) {
+    for (let i = 0; i < 40; i++) {
+      const a = rnd() * Math.PI * 2, d = rnd() * r;
+      g.fillStyle = rnd() < 0.5 ? c1 : c2;
+      g.beginPath(); g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.85, 3 + rnd() * 4, 0, Math.PI * 2); g.fill();
+    }
+  }
+
+  function psCeiling(g, rnd) {
+    const H0 = PS.ceilingH;
+    g.fillStyle = '#2a2519'; g.fillRect(0, 0, W, H0);
+    for (let i = 0; i < 3000; i++) {
+      const x = rnd() * W, y = rnd() * H0;
+      g.fillStyle = rnd() < 0.5 ? `rgba(0,0,0,${0.25 + rnd() * 0.3})` : `rgba(200,180,120,${0.1 + rnd() * 0.25})`;
+      g.fillRect(x, y, 2, 2);
+    }
+    // belki z jasnego drewna
+    const beam = pts => {
+      const gr = g.createLinearGradient(0, 0, 0, H0);
+      gr.addColorStop(0, '#9c7637'); gr.addColorStop(1, '#d6a85a');
+      g.fillStyle = gr;
+      g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(60,40,10,.6)'; g.lineWidth = 1.5; g.stroke();
+    };
+    beam([[330, 0], [372, 0], [474, H0], [432, H0]]);
+    beam([[1068, 0], [1106, 0], [1012, H0], [974, H0]]);
+    beam([[0, 22], [0, 44], [52, H0], [84, H0]]);
+    beam([[0, H0 - 12], [W, H0 - 12], [W, H0 - 3], [0, H0 - 3]]);
+    // rura
+    g.fillStyle = '#77736a'; g.fillRect(0, 50, W, 6);
+    g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(0, 50, W, 1.5);
+    // siatka
+    g.strokeStyle = 'rgba(235,235,220,.13)'; g.lineWidth = 0.7;
+    for (let x = -40; x < W + 40; x += 13) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 18, H0); g.stroke(); }
+    for (let y = 4; y < H0; y += 9) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y + 2); g.stroke(); }
+    // cień przy ścianie
+    let gr = g.createLinearGradient(0, H0 - 6, 0, H0 + 14);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.8)');
+    g.fillStyle = gr; g.fillRect(0, H0 - 6, W, 20);
+    // lampki choinkowe (prawa strona)
+    for (let i = 0; i < 46; i++) {
+      const x = 840 + i * 9.5 + rnd() * 6, y = 50 + Math.sin(i * 0.8) * 9 + rnd() * 8;
+      gr = g.createRadialGradient(x, y, 0, x, y, 7);
+      gr.addColorStop(0, 'rgba(255,245,215,.9)'); gr.addColorStop(1, 'rgba(255,230,170,0)');
+      g.fillStyle = gr; g.fillRect(x - 7, y - 7, 14, 14);
+      g.fillStyle = '#fffbe8'; g.beginPath(); g.arc(x, y, 1.4, 0, Math.PI * 2); g.fill();
+    }
+  }
+
+  function psDecoBottle(rnd) {
+    const shapes = [
+      { w: 30, h: 50, sh: 10, nw: 11, nh: 18 }, { w: 36, h: 44, sh: 8, nw: 12, nh: 16 },
+      { w: 28, h: 56, sh: 12, nw: 10, nh: 22 }, { w: 40, h: 40, sh: 12, nw: 12, nh: 14 },
+      { w: 26, h: 52, sh: 14, nw: 10, nh: 26 }, { w: 34, h: 58, sh: 6, nw: 12, nh: 14 },
+    ];
+    const glass = [['#c47a22', .85], ['#e9f2f5', .45], ['#2f5d2a', .9], ['#7a3b10', .92], ['#d9b25a', .75],
+      ['#4a6fa5', .6], ['#9c1f2a', .85], ['#efe3c0', .6], ['#bfe3c8', .55], ['#f0c85a', .7]];
+    const labels = ['#f3e6c8', '#1b1b1b', '#ffffff', '#c62828', '#203a5a', '#e6c35c', '#2e7d32'];
+    const s = shapes[Math.floor(rnd() * shapes.length)];
+    const [color, alpha] = glass[Math.floor(rnd() * glass.length)];
+    return {
+      b: { ...s, color, alpha, cap: rnd() < 0.5 ? '#222' : '#c9a227', label: labels[Math.floor(rnd() * labels.length)], lt: '', ltc: '#000' },
+      spout: rnd() < 0.6,
+    };
+  }
+
+  function psSkullBox(g, x, by, s) {
+    g.save(); g.translate(x, by); g.scale(s, s);
+    g.fillStyle = '#2f7fd0'; g.fillRect(-18, -58, 36, 58);
+    g.fillStyle = '#5aa6ef'; g.fillRect(-18, -58, 36, 8);
+    g.fillStyle = '#f4f4f4';
+    g.beginPath(); g.arc(0, -28, 11, 0, Math.PI * 2); g.fill(); g.fillRect(-6, -20, 12, 8);
+    g.fillStyle = '#1d3b6a';
+    g.beginPath(); g.arc(-4, -29, 3, 0, Math.PI * 2); g.arc(4, -29, 3, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1; g.strokeRect(-18, -58, 36, 58);
+    g.restore();
+  }
+
+  function psCabinet(g, rnd) {
+    const { x0, y0, x1, y1 } = PS.cab;
+    g.fillStyle = '#1b130d'; g.fillRect(x0 - 4, y0, x1 - x0 + 8, y1 - y0);
+    const ix0 = x0 + 8, iy0 = y0 + 8, ix1 = x1 - 8, iy1 = y1 - 4;
+    let gr = g.createLinearGradient(ix0, 0, ix1, 0);
+    gr.addColorStop(0, '#6b4318'); gr.addColorStop(0.2, '#c98d3e'); gr.addColorStop(0.5, '#e0a24e');
+    gr.addColorStop(0.8, '#c98d3e'); gr.addColorStop(1, '#6b4318');
+    g.fillStyle = gr; g.fillRect(ix0, iy0, ix1 - ix0, iy1 - iy0);
+    g.strokeStyle = 'rgba(90,45,10,.22)'; g.lineWidth = 1;
+    for (let i = 0; i < 70; i++) {
+      const x = ix0 + rnd() * (ix1 - ix0);
+      g.beginPath(); g.moveTo(x, iy0); g.lineTo(x + (rnd() - 0.5) * 6, iy1); g.stroke();
+    }
+    // przyciemnienie u góry każdej półki
+    const tops = [iy0, PS.shelfY[0] + 10];
+    for (let s = 0; s < 2; s++) {
+      gr = g.createLinearGradient(0, tops[s], 0, PS.shelfY[s]);
+      gr.addColorStop(0, 'rgba(20,10,0,.55)'); gr.addColorStop(1, 'rgba(255,220,150,.1)');
+      g.fillStyle = gr; g.fillRect(ix0, tops[s], ix1 - ix0, PS.shelfY[s] - tops[s]);
+    }
+    // gęsto ustawione butelki dekoracyjne (te do gry rysowane są osobno, przed nimi)
+    const itemXs = ITEMS.filter(i => i.shelf >= 0 && i.shelf < 2).map(i => COL_X[i.col]);
+    for (let s = 0; s < 2; s++) {
+      const y = PS.shelfY[s];
+      for (let x = ix0 + 12; x < ix1 - 10; x += 22 + rnd() * 9) {
+        if (itemXs.some(ix => Math.abs(ix - x) < 26)) continue;
+        if (s === 0 && x > COL_X[2] - 30 && x < COL_X[3] + 30) continue; // miejsce na pudełka z czaszkami
+        const d = psDecoBottle(rnd);
+        const sc = 0.56 + rnd() * 0.1;
+        drawBottle(g, x, y, d, sc);
+        if (d.spout) {
+          const top = y - (d.b.h + d.b.sh + d.b.nh + 6) * sc;
+          g.strokeStyle = '#151515'; g.lineWidth = 2;
+          g.beginPath(); g.moveTo(x, top); g.lineTo(x + 3, top - 9); g.stroke();
+        }
+      }
+    }
+    psSkullBox(g, COL_X[2] - 4, PS.shelfY[0], 0.95);
+    psSkullBox(g, COL_X[3] - 8, PS.shelfY[0], 0.95);
+    psSkullBox(g, COL_X[3] + 26, PS.shelfY[0], 0.8);
+    // deski z jasnym LED-em na krawędzi
+    for (let s = 0; s < 2; s++) {
+      const y = PS.shelfY[s];
+      g.fillStyle = '#0f0c0a'; g.fillRect(x0, y, x1 - x0, 10);
+      g.save(); g.shadowColor = 'rgba(255,250,230,1)'; g.shadowBlur = 10;
+      g.fillStyle = 'rgba(255,252,240,.95)'; g.fillRect(ix0, y - 1, ix1 - ix0, 2);
+      g.restore();
+    }
+    g.fillStyle = '#1b130d'; g.fillRect(x0 - 4, y1 - 2, x1 - x0 + 8, 6);
+  }
+
+  function psSign(g, rnd) {
+    // liście za literami
+    psFoliage(g, rnd, 262, 118, 58, 42, 55);
+    psFoliage(g, rnd, 948, 112, 66, 46, 60);
+    psFoliage(g, rnd, 640, 128, 300, 26, 70, 0.9);
+
+    // tęczowa flaga
+    g.strokeStyle = '#b9b2a2'; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(330, 156); g.lineTo(318, 80); g.stroke();
+    g.save(); g.translate(318, 82); g.rotate(-0.12);
+    ['#e40303', '#ff8c00', '#ffed00', '#008026', '#004dff', '#750787'].forEach((c, i) => {
+      g.fillStyle = c;
+      g.beginPath();
+      g.moveTo(0, i * 7);
+      g.quadraticCurveTo(26, i * 7 - 5, 52, i * 7 + 2);
+      g.lineTo(52, i * 7 + 9);
+      g.quadraticCurveTo(26, i * 7 + 2, 0, i * 7 + 7);
+      g.closePath(); g.fill();
+    });
+    g.restore();
+
+    // złote litery z pogniecionej folii
+    const lc = layer(), lg = lc.getContext('2d');
+    lg.font = `900 118px "Arial Black", "Segoe UI Black", ${FONT}`;
+    lg.textAlign = 'center'; lg.textBaseline = 'alphabetic';
+    const letters = [['P', 420, -0.03, 0.95], ['S', 530, 0.02, 0.92], ['O', 642, -0.015, 0.95], ['T', 752, 0.025, 0.95], ['A', 866, -0.02, 1.0]];
+    for (const [ch, x, rot, sx] of letters) {
+      lg.save(); lg.translate(x, 160); lg.rotate(rot); lg.scale(sx, 1);
+      lg.fillStyle = '#c9a043'; lg.fillText(ch, 0, 0);
+      lg.restore();
+    }
+    lg.globalCompositeOperation = 'source-atop';
+    const tones = ['rgba(255,240,170,.6)', 'rgba(150,110,30,.5)', 'rgba(230,190,90,.55)', 'rgba(110,80,20,.4)', 'rgba(255,255,225,.45)'];
+    for (let i = 0; i < 1800; i++) {
+      const x = 345 + rnd() * 590, y = 66 + rnd() * 100, s = 5 + rnd() * 14;
+      lg.fillStyle = tones[Math.floor(rnd() * tones.length)];
+      lg.beginPath(); lg.moveTo(x, y); lg.lineTo(x + s, y + (rnd() - 0.5) * s); lg.lineTo(x + (rnd() - 0.5) * s, y + s); lg.closePath(); lg.fill();
+    }
+    const gr = lg.createLinearGradient(0, 70, 0, 162);
+    gr.addColorStop(0, 'rgba(255,240,180,.25)'); gr.addColorStop(1, 'rgba(90,60,10,.3)');
+    lg.fillStyle = gr; lg.fillRect(0, 60, W, 110);
+    lg.globalCompositeOperation = 'source-over';
+    g.save(); g.shadowColor = 'rgba(0,0,0,.7)'; g.shadowBlur = 10; g.shadowOffsetY = 3;
+    g.drawImage(lc, 0, 0);
+    g.restore();
+
+    // liście przed literami, kwiaty
+    psFoliage(g, rnd, 640, 152, 290, 8, 26, 0.75);
+    psFoliage(g, rnd, 236, 140, 26, 16, 14, 0.9);
+    psPompom(g, rnd, 296, 146, 15, '#f7e65a', '#fff3a0');
+    g.strokeStyle = '#d8c79a'; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(960, 156); g.lineTo(972, 72); g.stroke();
+    g.beginPath(); g.moveTo(988, 156); g.lineTo(980, 84); g.stroke();
+    g.fillStyle = '#ff6fa8';
+    g.beginPath(); g.ellipse(944, 128, 12, 10, -0.4, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.beginPath(); g.moveTo(944, 128); g.lineTo(952, 116); g.stroke();
+    psPompom(g, rnd, 992, 140, 17, '#9b59d0', '#c38be8');
+  }
+
+  function psBackCounter(g, rnd) {
+    const y = PS.counterY;
+    // kafle
+    g.fillStyle = '#141414'; g.fillRect(0, PS.cab.y1, W, BAR_TOP + 30 - PS.cab.y1);
+    g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1;
+    for (let ty = PS.cab.y1; ty < BAR_TOP + 30; ty += 40) for (let tx = 0; tx < W; tx += 40) g.strokeRect(tx + 0.5, ty + 0.5, 40, 40);
+    // dolna półka (softy) z LED-em
+    const sy = PS.shelfY[2];
+    let gr = g.createLinearGradient(0, sy - 70, 0, sy);
+    gr.addColorStop(0, 'rgba(255,240,210,0)'); gr.addColorStop(1, 'rgba(255,240,210,.12)');
+    g.fillStyle = gr; g.fillRect(PS.cab.x0, sy - 70, PS.cab.x1 - PS.cab.x0, 70);
+    g.fillStyle = '#24170f'; g.fillRect(PS.cab.x0, sy, PS.cab.x1 - PS.cab.x0, 10);
+    g.save(); g.shadowColor = 'rgba(255,250,230,1)'; g.shadowBlur = 8;
+    g.fillStyle = 'rgba(255,252,240,.85)'; g.fillRect(PS.cab.x0 + 6, sy - 1, PS.cab.x1 - PS.cab.x0 - 12, 2);
+    g.restore();
+
+    // blat roboczy z tyłu
+    g.fillStyle = '#2b2018'; g.fillRect(0, y, W, 8);
+    // szklanki
+    for (let row = 0; row < 2; row++) {
+      for (let x = 228 + row * 9; x < 440; x += 19) {
+        const types = ['tumbler', 'highball', 'shot'];
+        drawGlass(g, x, y - row * 16, types[Math.floor(rnd() * 3)], '#000', 0, 0.55 + rnd() * 0.15);
+      }
+    }
+    // automat do shotów z pomarańczową poświatą
+    g.fillStyle = '#1e1e20'; rr(g, 588, y - 62, 86, 62, 6); g.fill();
+    g.fillStyle = '#2c2c30'; rr(g, 600, y - 76, 62, 16, 4); g.fill();
+    gr = g.createRadialGradient(631, y - 30, 2, 631, y - 30, 30);
+    gr.addColorStop(0, 'rgba(255,140,40,.95)'); gr.addColorStop(0.6, 'rgba(255,90,20,.6)'); gr.addColorStop(1, 'rgba(255,80,20,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(631, y - 30, 30, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#ffd08a'; g.lineWidth = 2; g.beginPath(); g.arc(631, y - 30, 16, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#c0c4c8'; g.fillRect(628, y - 60, 6, 12);
+    // pudełko z serwetkami
+    g.fillStyle = '#e9e4da'; g.fillRect(700, y - 22, 44, 22);
+    g.fillStyle = '#c9b38a'; g.fillRect(704, y - 30, 36, 9);
+    // druciane kosze z cytrusami
+    for (const [bx, fr] of [[842, ['#f39c12', '#f7c948', '#e67e22']], [902, ['#f39c12', '#f5b041', '#f7dc6f']]]) {
+      for (let i = 0; i < 9; i++) {
+        g.fillStyle = fr[i % fr.length];
+        g.beginPath(); g.arc(bx - 16 + (i % 4) * 11 + rnd() * 3, y - 34 - Math.floor(i / 4) * 9 + rnd() * 3, 7, 0, Math.PI * 2); g.fill();
+      }
+      g.strokeStyle = 'rgba(200,200,200,.75)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(bx - 26, y - 44); g.lineTo(bx - 20, y); g.lineTo(bx + 20, y); g.lineTo(bx + 26, y - 44); g.stroke();
+      for (let k = 1; k < 4; k++) { const yy = y - k * 11; g.beginPath(); g.moveTo(bx - 20 - k * 1.5, yy); g.lineTo(bx + 20 + k * 1.5, yy); g.stroke(); }
+      for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(bx + k * 9, y); g.lineTo(bx + k * 11, y - 44); g.stroke(); }
+      g.beginPath(); g.arc(bx, y - 44, 18, Math.PI, 0); g.stroke();
+    }
+    // kartonowa tabliczka „CZEREŚNIE!”
+    psCardboard(g, 968, 418, 108, 40, -0.14, ['CZEREŚNIE!'], 17);
+    g.strokeStyle = '#222'; g.lineWidth = 2; g.beginPath(); g.moveTo(968, 438); g.lineTo(966, y); g.stroke();
+  }
+
+  function psCardboard(g, cx, cy, w, h, rot, lines, size, title) {
+    g.save();
+    g.translate(cx, cy); g.rotate(rot);
+    const gr = g.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+    gr.addColorStop(0, '#b97a4a'); gr.addColorStop(1, '#9c5f34');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.moveTo(-w / 2 + 3, -h / 2); g.lineTo(w / 2 - 2, -h / 2 + 2); g.lineTo(w / 2, h / 2 - 3); g.lineTo(-w / 2 + 1, h / 2); g.closePath();
+    g.fill();
+    g.strokeStyle = 'rgba(60,30,10,.5)'; g.lineWidth = 1; g.stroke();
+    g.fillStyle = '#1d140e';
+    g.textBaseline = 'middle';
+    let yy = -h / 2 + 4;
+    if (title) {
+      g.textAlign = 'center';
+      let ts = size + 3;
+      do { g.font = `800 ${ts}px "Segoe Print", "Comic Sans MS", ${FONT}`; } while (g.measureText(title).width > w - 14 && --ts > 8);
+      g.fillText(title, 0, yy + size * 0.8); yy += size * 1.8;
+      g.textAlign = 'left';
+    } else g.textAlign = 'center';
+    g.font = `700 ${size}px "Segoe Print", "Comic Sans MS", ${FONT}`;
+    const step = title ? size * 1.45 : 0;
+    lines.forEach((t, i) => {
+      if (title) g.fillText(t, -w / 2 + 12, yy + i * step + size * 0.5);
+      else g.fillText(t, 0, 0);
+    });
+    g.restore();
+  }
+
+  function psGreenSign(g, x, y, w, h, lines, size) {
+    g.fillStyle = '#3c9a6a'; rr(g, x, y, w, h, 3); g.fill();
+    g.strokeStyle = '#256b47'; g.lineWidth = 2; g.stroke();
+    g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `800 ${size}px ${FONT}`;
+    const lh = size * 1.25, top = y + h / 2 - ((lines.length - 1) * lh) / 2;
+    lines.forEach((t, i) => g.fillText(t, x + w / 2, top + i * lh));
+  }
+
+  function buildBgPsota() {
+    const L = layer(), g = L.getContext('2d');
+    const rnd = mulberry32(2023);
+    g.fillStyle = '#0c0a09'; g.fillRect(0, 0, W, BAR_TOP + 30);
+    psCeiling(g, rnd);
+    psBackCounter(g, rnd);
+    psCabinet(g, rnd);
+    psSign(g, rnd);
+
+    // nazwy na krawędziach półek
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#f3e3c3';
+    for (let s = 0; s < 3; s++) {
+      for (let c = 0; c < COLS; c++) {
+        const it = GRID[s][c];
+        if (!it) continue;
+        const name = it.name.toUpperCase();
+        fitFont(g, name, 86, 9);
+        g.fillText(name, COL_X[c], PS.shelfY[s] + 6);
+      }
+    }
+
+    // zielone tabliczki (prawa strona)
+    psGreenSign(g, 1024, 150, 116, 96, ['OSOBOM', 'NIETRZEŹWYM ORAZ', 'MŁODZIEŻY DO LAT 18', 'ALKOHOLU', 'NIE SPRZEDAJEMY'], 10);
+    psGreenSign(g, 1150, 150, 116, 96, ['ALKOHOL', 'SZKODZI', 'ZDROWIU'], 14);
+    // sterowanie na kartonie
+    psCardboard(g, 1142, 300, 232, 96, 0.03,
+      ['← →  ruch   ↑ ↓  półka', 'Spacja  weź / podaj', 'X  odłóż    P  pauza'], 13, 'STEROWANIE');
+    // przepis na kartonie (lewa strona)
+    psCardboard(g, 108, 300, 192, 236, -0.03,
+      ['1. weź shaker', '2. lód z wiaderka', '3. whisky albo rum', '4. sweet', '5. sour', '6. shake ×3', '7. podaj!'], 13, 'WHISKEY / RUM SOUR');
+    return L;
+  }
+
+  function buildBarPsota() {
+    const L = layer(), g = L.getContext('2d');
+    // podłoga
+    g.fillStyle = '#0a0807'; g.fillRect(0, BAR_BOTTOM, W, H - BAR_BOTTOM);
+    // front z ciemnych drewnianych listew
+    g.fillStyle = '#0e0805'; g.fillRect(0, BAR_FRONT, W, H - BAR_FRONT);
+    const rnd = mulberry32(77);
+    for (let x = 0; x < W; x += 46) {
+      const gr = g.createLinearGradient(0, BAR_FRONT, 0, H);
+      const v = rnd() * 14;
+      gr.addColorStop(0, `rgb(${62 + v},${38 + v * 0.6},${24 + v * 0.4})`);
+      gr.addColorStop(1, `rgb(${30 + v},${18 + v * 0.5},${11})`);
+      g.fillStyle = gr; g.fillRect(x + 3, BAR_FRONT, 40, H - BAR_FRONT);
+      g.fillStyle = 'rgba(255,200,150,.07)'; g.fillRect(x + 3, BAR_FRONT, 2, H - BAR_FRONT);
+    }
+    let gr = g.createLinearGradient(0, BAR_FRONT, 0, BAR_FRONT + 30);
+    gr.addColorStop(0, 'rgba(0,0,0,.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, BAR_FRONT, W, 30);
+    // czarny, błyszczący blat
+    gr = g.createLinearGradient(0, BAR_TOP, 0, BAR_LIP);
+    gr.addColorStop(0, '#1e1c1a'); gr.addColorStop(1, '#070707');
+    g.fillStyle = gr; g.fillRect(0, BAR_TOP, W, BAR_LIP - BAR_TOP);
+    for (let i = 0; i < 18; i++) {
+      const x = 40 + rnd() * (W - 80);
+      g.fillStyle = `rgba(255,${200 + Math.floor(rnd() * 50)},150,.06)`;
+      g.beginPath(); g.ellipse(x, BAR_LIP - 6, 18 + rnd() * 30, 3, 0, 0, Math.PI * 2); g.fill();
+    }
+    // gumowe maty barowe
+    for (const [mx, mw] of [[24, 520], [596, 500]]) {
+      g.fillStyle = '#121513'; rr(g, mx, BAR_TOP + 2, mw, 12, 3); g.fill();
+      g.strokeStyle = 'rgba(80,140,100,.4)'; g.lineWidth = 1; g.stroke();
+      g.fillStyle = 'rgba(240,230,200,.55)'; g.font = `italic 700 9px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      for (let k = 0; k < 3; k++) g.fillText('✦ PSOTA ✦', mx + mw * (k + 0.5) / 3, BAR_TOP + 8);
+    }
+    // krawędź blatu
+    gr = g.createLinearGradient(0, BAR_LIP, 0, BAR_FRONT);
+    gr.addColorStop(0, '#4a2c18'); gr.addColorStop(1, '#170d07');
+    g.fillStyle = gr; g.fillRect(0, BAR_LIP, W, BAR_FRONT - BAR_LIP);
+    g.fillStyle = 'rgba(255,170,90,.45)'; g.fillRect(0, BAR_LIP, W, 1.5);
+    return L;
+  }
+
+  // ===================== Motywy (bary) =====================
+  const THEMES = {
+    classic: { name: 'Bar klasyczny', shelfY: [140, 250, 360], bottleScale: 1, tap: 'chrome', buildBg: buildBgClassic, buildBar: buildBarClassic },
+    psota: { name: 'PSOTA', shelfY: PS.shelfY, bottleScale: 0.72, tap: 'copper', buildBg: buildBgPsota, buildBar: buildBarPsota },
+  };
+  const THEME_IDS = Object.keys(THEMES);
+  let THEME_ID = 'classic', THEME = THEMES.classic, BG = null, BAR = null;
+
+  function applyTheme(id) {
+    if (!THEMES[id]) id = 'classic';
+    THEME_ID = id; THEME = THEMES[id];
+    SHELF_Y = THEME.shelfY; BOTTLE_S = THEME.bottleScale;
+    if (!THEME.bg) { THEME.bg = THEME.buildBg(); THEME.bar = THEME.buildBar(); }
+    BG = THEME.bg; BAR = THEME.bar;
+  }
+  function loadTheme() { try { return localStorage.getItem('barman.theme') || 'classic'; } catch (e) { return 'classic'; } }
+  function saveTheme(id) { try { localStorage.setItem('barman.theme', id); } catch (e) { /* brak dostępu */ } }
 
   // ===================== Render =====================
-  function render() {
+  function render(thumb = false) {
     const g = ctx;
     g.drawImage(BG, 0, 0);
 
@@ -1176,8 +1626,9 @@
     const away = b.pick ? b.pick.it : b.holding;
     for (const it of ITEMS) {
       if (it.shelf < 0 || it === away) continue;
-      drawBottle(g, COL_X[it.col], SHELF_Y[it.shelf], it);
+      drawBottle(g, COL_X[it.col], SHELF_Y[it.shelf], it, BOTTLE_S);
     }
+    if (thumb) { drawBartender(g); g.drawImage(BAR, 0, 0); drawTap(g); drawStations(g); return; }
     drawSelection(g, 'shelf');
     drawBartender(g);
     g.drawImage(BAR, 0, 0);
@@ -1222,6 +1673,14 @@
   // Wspólna obsługa akcji z klawiatury i gamepada
   function action(a, repeat) {
     if (a === 'mute') { if (!repeat) { const m = sfx.toggle(); toast(m ? 'Dźwięk wyłączony' : 'Dźwięk włączony'); } return; }
+    if (S.mode === 'menu' && (a === 'left' || a === 'right')) {
+      if (!repeat) {
+        const i = THEME_IDS.indexOf(THEME_ID) + (a === 'left' ? -1 : 1);
+        selectTheme(THEME_IDS[(i + THEME_IDS.length) % THEME_IDS.length]);
+        sfx.tick();
+      }
+      return;
+    }
     if (S.mode === 'menu' || S.mode === 'over') {
       // po końcu gry chwila przerwy, żeby nie zrestartować przypadkiem
       if (S.mode === 'over' && S.time - S.overTime < 1) return;
@@ -1283,20 +1742,45 @@
 
   document.querySelectorAll('[data-start]').forEach(btn => btn.addEventListener('click', e => { e.currentTarget.blur(); startGame(); }));
   document.getElementById('btn-resume').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });
+  document.querySelectorAll('[data-menu]').forEach(btn => btn.addEventListener('click', e => { e.currentTarget.blur(); goMenu(); }));
 
   document.querySelectorAll('#touch [data-act]').forEach(btn => {
     btn.addEventListener('pointerdown', e => {
       e.preventDefault();
-      const a = btn.dataset.act;
-      if (S.mode === 'menu' || S.mode === 'over') { if (a === 'use') startGame(); return; }
-      if (S.mode === 'paused') { if (a === 'use') togglePause(); return; }
-      input(a);
+      action(btn.dataset.act, false);
     });
   });
 
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'playing') togglePause(); });
   window.addEventListener('blur', () => { if (S.mode === 'playing') togglePause(); });
 
+  // ===================== Wybór baru =====================
+  function selectTheme(id) {
+    applyTheme(id);
+    saveTheme(THEME_ID);
+    document.querySelectorAll('.bar-card').forEach(c => c.setAttribute('aria-checked', String(c.dataset.theme === THEME_ID)));
+  }
+
+  function goMenu() {
+    Object.assign(S, { mode: 'menu', customers: [], floats: [], toast: null, bt: newBartender() });
+    showPanel('panel-menu');
+  }
+
+  // miniatury plansz w kartach wyboru
+  function makeThumbs() {
+    for (const id of THEME_IDS) {
+      const c = document.querySelector(`.bar-card[data-theme="${id}"] canvas`);
+      if (!c) continue;
+      applyTheme(id);
+      render(true);
+      c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+    }
+  }
+
+  document.querySelectorAll('.bar-card').forEach(card => card.addEventListener('click', () => { selectTheme(card.dataset.theme); sfx.tick(); }));
+
+  makeThumbs();
+  selectTheme(loadTheme());
   showPanel('panel-menu');
   requestAnimationFrame(frame);
 })();

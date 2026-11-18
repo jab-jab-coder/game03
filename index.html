@@ -16,26 +16,41 @@
         <section class="panel active" id="panel-menu">
           <h1>Barman</h1>
           <p class="sub">Edycja 1</p>
-          <p>Klienci podchodzą do baru i zamawiają drinki. Podejdź do właściwej butelki, weź ją
-            i podaj klientowi, zanim straci cierpliwość. Piwo nalewasz z kranu na końcu baru.
-            Liczy się <b>czas</b> i <b>trafność</b> zamówień!</p>
-          <p><b>Whiskey Sour / Rum Sour:</b> weź shaker → lód z wiaderka → whisky albo rum → sweet → sour →
-            shake, shake, shake (Spacja ×3) → podaj.</p>
-          <table class="keys">
-            <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>ruch za barem</td></tr>
-            <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>wybór półki (górna / środkowa / dolna)</td></tr>
-            <tr><td><kbd>Spacja</kbd></td><td>weź butelkę / nalej piwo / podaj klientowi</td></tr>
-            <tr><td><kbd>X</kbd></td><td>odłóż to, co trzymasz</td></tr>
-            <tr><td><kbd>P</kbd> <kbd>M</kbd></td><td>pauza / dźwięk</td></tr>
-            <tr><td>🎮 Gamepad</td><td>krzyżak / gałka – ruch i półka · A – weź / podaj · B / X – odłóż · Start – pauza · Select – dźwięk</td></tr>
-          </table>
+          <p class="choose">Wybierz bar <span>(kliknij albo ← →)</span></p>
+          <div class="bars" role="radiogroup" aria-label="Wybór baru">
+            <button class="bar-card" data-theme="classic" role="radio" aria-checked="true">
+              <canvas width="256" height="144"></canvas>
+              <b>Bar klasyczny</b><span>cegła, mosiądz, chromowany kran</span>
+            </button>
+            <button class="bar-card" data-theme="psota" role="radio" aria-checked="false">
+              <canvas width="256" height="144"></canvas>
+              <b>PSOTA</b><span>złote litery, dżungla, miedziany kran</span>
+            </button>
+          </div>
           <button class="btn" data-start>Zacznij zmianę</button>
           <p class="best">Rekord: <span class="best-val">0</span></p>
+          <details class="rules">
+            <summary>Zasady i sterowanie</summary>
+            <p>Klienci podchodzą do baru i zamawiają drinki. Podejdź do właściwej butelki, weź ją
+              i podaj klientowi, zanim straci cierpliwość. Piwo nalewasz z kranu na końcu baru.
+              Liczy się <b>czas</b> i <b>trafność</b> zamówień!</p>
+            <p><b>Whiskey Sour / Rum Sour:</b> weź shaker → lód z wiaderka → whisky albo rum → sweet → sour →
+              shake, shake, shake (Spacja ×3) → podaj.</p>
+            <table class="keys">
+              <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>ruch za barem</td></tr>
+              <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>wybór półki (górna / środkowa / dolna)</td></tr>
+              <tr><td><kbd>Spacja</kbd></td><td>weź butelkę / nalej piwo / podaj klientowi</td></tr>
+              <tr><td><kbd>X</kbd></td><td>odłóż to, co trzymasz</td></tr>
+              <tr><td><kbd>P</kbd> <kbd>M</kbd></td><td>pauza / dźwięk</td></tr>
+              <tr><td>🎮 Gamepad</td><td>krzyżak / gałka – ruch i półka · A – weź / podaj · B / X – odłóż · Start – pauza · Select – dźwięk</td></tr>
+            </table>
+          </details>
         </section>
 
         <section class="panel" id="panel-pause">
           <h2>Pauza</h2>
           <button class="btn" id="btn-resume">Wznów</button>
+          <button class="btn secondary" data-menu>Menu</button>
         </section>
 
         <section class="panel" id="panel-over">
@@ -44,6 +59,7 @@
           <p>Obsłużeni klienci: <b id="over-served">0</b> · Poziom: <b id="over-level">1</b></p>
           <p class="best">Rekord: <span class="best-val">0</span> <span id="over-newbest" class="newbest"></span></p>
           <button class="btn" data-start>Zagraj ponownie</button>
+          <button class="btn secondary" data-menu>Zmień bar</button>
         </section>
       </div>
     </div>
