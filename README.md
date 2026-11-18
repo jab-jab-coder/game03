@@ -42,12 +42,25 @@ Na telefonie pod planszą pojawiają się przyciski dotykowe.
   Co 3. poziom oddaje jedno życie.
 - Rekord zapisuje się w przeglądarce (localStorage).
 
+### Koktajle: Whiskey Sour i Rum Sour
+
+1. Podejdź do shakera (lewy koniec baru) i weź go (Spacja).
+2. Przy wiaderku z lodem dosyp lód.
+3. Dodaj whisky (Whiskey Sour) albo rum (Rum Sour) z górnej półki.
+4. Dodaj **sweet**, a potem **sour** z dolnej półki.
+5. Zrób shake, shake, shake: Spacja ×3.
+6. Podejdź do klienta i podaj.
+
+Kolejność jest ścisła. Zły składnik nie trafi do shakera, a gra podpowie, co dodać teraz.
+`X` wylewa zawartość i odstawia shaker. Koktajlowi klienci są cierpliwsi (×2,2),
+a za koktajl dostaje się więcej punktów (120 + do 180 za szybkość).
+
 ## Półki
 
-- **Górna:** whisky, wódka, rum, gin, tequila, koniak
-- **Środkowa:** wino czerwone, wino białe, prosecco, wermut, likier ziołowy, amaretto
-- **Dolna:** cola, tonik, sok pomarańczowy, sok jabłkowy, syrop grenadyna, woda gazowana
-- **Bar:** kran z piwem
+- **Górna:** szklanki (dekoracja), whisky, wódka, rum, gin, tequila, koniak
+- **Środkowa:** cytryny i limonki (dekoracja), wino czerwone, wino białe, prosecco, wermut, likier ziołowy, amaretto
+- **Dolna:** sweet, sour, cola, tonik, sok pomarańczowy, sok jabłkowy, syrop grenadyna, woda gazowana
+- **Bar:** shaker i wiaderko z lodem (lewa strona), kran z piwem (prawa strona)
 
 ## Uruchomienie lokalne
 

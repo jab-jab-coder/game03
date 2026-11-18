@@ -9,13 +9,21 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
 
-  const SHELF_COLS = 6;          // kolumny z butelkami
-  const TAP_COL = 6;             // kolumna przy kranie z piwem
-  const COLS = 7;
-  const COL_X = [105, 265, 425, 585, 745, 905, 1110];
+  // Kolumny, w których może stanąć barman:
+  // 0 – shaker (na barze), 1 – wiaderko z lodem (na barze), 2..9 – półki, 10 – kran z piwem
+  const SHAKER_COL = 0, ICE_COL = 1, TAP_COL = 10;
+  const COLUMNS = [
+    { x: 70, kind: 'shaker' },
+    { x: 168, kind: 'ice' },
+    ...Array.from({ length: 8 }, (_, i) => ({ x: 280 + i * 96, kind: 'shelf' })),
+    { x: 1110, kind: 'tap' },
+  ];
+  const COLS = COLUMNS.length;
+  const COL_X = COLUMNS.map(c => c.x);
+  const SEATS = [0, 2, 4, 6, 8, 10];   // kolumny, przy których stają klienci
   const TAP_X = 1192;
   const SHELF_Y = [140, 250, 360]; // górna, środkowa, dolna (y deski)
-  const SHELF_LEFT = 18, SHELF_RIGHT = 992;
+  const SHELF_LEFT = 228, SHELF_RIGHT = 994;
   const BAR_TOP = 482, BAR_LIP = 500, BAR_FRONT = 512, BAR_BOTTOM = 625;
   const GLASS_BASE = 496;
   const FONT = '"Segoe UI", system-ui, -apple-system, Roboto, sans-serif';
@@ -23,6 +31,9 @@
   const MOVE_SPEED = 1700;   // px/s
   const POUR_TIME = 0.8;     // s – nalewanie piwa
   const PICK_TIME = 0.22;    // s – animacja zdejmowania butelki
+  const ADD_TIME = 0.32;     // s – dodanie składnika do shakera
+  const SHAKE_TIME = 0.35;   // s – animacja jednego „shake”
+  const SHAKES_NEEDED = 3;
   const MAX_LIVES = 3;
   const SERVES_PER_LEVEL = 6;
 
@@ -30,53 +41,79 @@
   // b – geometria butelki: w/h korpus, sh ramię, nw/nh szyjka
   const ITEMS = [
     // Górna półka – mocne alkohole
-    { id: 'whisky', name: 'Whisky', shelf: 0, col: 0, glass: 'tumbler', liquid: '#c47a22', weight: 2,
+    { id: 'whisky', name: 'Whisky', shelf: 0, col: 4, glass: 'tumbler', liquid: '#c47a22', weight: 2,
       b: { w: 46, h: 46, sh: 8, nw: 13, nh: 16, color: '#a35a17', alpha: .92, cap: '#2b1a0e', label: '#efe1bf', lt: 'WHISKY', ltc: '#5a2e0a' } },
-    { id: 'wodka', name: 'Wódka', shelf: 0, col: 1, glass: 'shot', liquid: '#eef7ff', weight: 3,
+    { id: 'wodka', name: 'Wódka', shelf: 0, col: 5, glass: 'shot', liquid: '#eef7ff', weight: 3,
       b: { w: 32, h: 52, sh: 12, nw: 11, nh: 18, color: '#dceefc', alpha: .6, cap: '#c62828', label: '#c62828', lt: 'WÓDKA', ltc: '#ffffff' } },
-    { id: 'rum', name: 'Rum', shelf: 0, col: 2, glass: 'tumbler', liquid: '#8a4514', weight: 1.5,
+    { id: 'rum', name: 'Rum', shelf: 0, col: 6, glass: 'tumbler', liquid: '#8a4514', weight: 1.5,
       b: { w: 38, h: 48, sh: 10, nw: 12, nh: 16, color: '#5c2a0b', alpha: .95, cap: '#d4a017', label: '#f3d27a', lt: 'RUM', ltc: '#5c2a0b' } },
-    { id: 'gin', name: 'Gin', shelf: 0, col: 3, glass: 'highball', liquid: '#eaf7f0', weight: 1.5,
+    { id: 'gin', name: 'Gin', shelf: 0, col: 7, glass: 'highball', liquid: '#eaf7f0', weight: 1.5,
       b: { w: 36, h: 50, sh: 9, nw: 13, nh: 15, color: '#7fc8b0', alpha: .6, cap: '#1d3b5a', label: '#1d3b5a', lt: 'GIN', ltc: '#e8f6ff' } },
-    { id: 'tequila', name: 'Tequila', shelf: 0, col: 4, glass: 'shot', liquid: '#f2d27a', weight: 1,
+    { id: 'tequila', name: 'Tequila', shelf: 0, col: 8, glass: 'shot', liquid: '#f2d27a', weight: 1,
       b: { w: 30, h: 56, sh: 8, nw: 12, nh: 14, color: '#f0c85a', alpha: .75, cap: '#8b5a2b', label: '#2e7d32', lt: 'TEQUILA', ltc: '#ffffff' } },
-    { id: 'koniak', name: 'Koniak', shelf: 0, col: 5, glass: 'tumbler', liquid: '#a5521a', weight: 1,
+    { id: 'koniak', name: 'Koniak', shelf: 0, col: 9, glass: 'tumbler', liquid: '#a5521a', weight: 1,
       b: { w: 50, h: 40, sh: 14, nw: 12, nh: 16, color: '#86400f', alpha: .95, cap: '#c9a227', label: '#1b1b1b', lt: 'KONIAK', ltc: '#e8c460' } },
 
     // Środkowa półka – inne alkohole
-    { id: 'wino_czerwone', name: 'Wino czerwone', shelf: 1, col: 0, glass: 'wine', liquid: '#8b1428', weight: 1.5,
+    { id: 'wino_czerwone', name: 'Wino czerwone', shelf: 1, col: 4, glass: 'wine', liquid: '#8b1428', weight: 1.5,
       b: { w: 30, h: 46, sh: 12, nw: 10, nh: 24, color: '#3b0a12', alpha: .97, cap: '#7b1022', label: '#f5efe0', lt: 'ROSSO', ltc: '#7b1022' } },
-    { id: 'wino_biale', name: 'Wino białe', shelf: 1, col: 1, glass: 'wine', liquid: '#f3e7a1', weight: 1.5,
+    { id: 'wino_biale', name: 'Wino białe', shelf: 1, col: 5, glass: 'wine', liquid: '#f3e7a1', weight: 1.5,
       b: { w: 30, h: 46, sh: 12, nw: 10, nh: 24, color: '#b9c76a', alpha: .75, cap: '#d9c36a', label: '#fffbe8', lt: 'BIANCO', ltc: '#6b7a1a' } },
-    { id: 'prosecco', name: 'Prosecco', shelf: 1, col: 2, glass: 'flute', liquid: '#f6eaa8', weight: 1,
+    { id: 'prosecco', name: 'Prosecco', shelf: 1, col: 6, glass: 'flute', liquid: '#f6eaa8', weight: 1,
       b: { w: 34, h: 48, sh: 12, nw: 12, nh: 20, color: '#2f5d2a', alpha: .95, cap: '#d4af37', label: '#f6f0d8', lt: 'PROSECCO', ltc: '#2f5d2a' } },
-    { id: 'wermut', name: 'Wermut', shelf: 1, col: 3, glass: 'wine', liquid: '#c0392b', weight: 1,
+    { id: 'wermut', name: 'Wermut', shelf: 1, col: 7, glass: 'wine', liquid: '#c0392b', weight: 1,
       b: { w: 34, h: 52, sh: 10, nw: 12, nh: 16, color: '#7a1a14', alpha: .9, cap: '#222222', label: '#f2e6c9', lt: 'WERMUT', ltc: '#7a1a14' } },
-    { id: 'likier', name: 'Likier ziołowy', shelf: 1, col: 4, glass: 'shot', liquid: '#4a3418', weight: 1,
+    { id: 'likier', name: 'Likier ziołowy', shelf: 1, col: 8, glass: 'shot', liquid: '#4a3418', weight: 1,
       b: { w: 40, h: 46, sh: 8, nw: 13, nh: 14, color: '#1f3d1f', alpha: .97, cap: '#c8a03a', label: '#d9b14a', lt: 'ZIOŁOWY', ltc: '#1f3d1f' } },
-    { id: 'amaretto', name: 'Amaretto', shelf: 1, col: 5, glass: 'tumbler', liquid: '#b8621e', weight: 1,
+    { id: 'amaretto', name: 'Amaretto', shelf: 1, col: 9, glass: 'tumbler', liquid: '#b8621e', weight: 1,
       b: { w: 40, h: 44, sh: 10, nw: 13, nh: 14, color: '#a8561a', alpha: .85, cap: '#e6e6e6', label: '#f3e3c3', lt: 'AMARETTO', ltc: '#7a3b10' } },
 
+    // Dolna półka – składniki koktajli (butelki w kształcie klasycznej butelki po rumie)
+    // weight: 0 – nikt nie zamawia ich osobno
+    { id: 'sweet', name: 'Sweet', shelf: 2, col: 2, glass: 'shot', liquid: '#f5edc8', weight: 0,
+      b: { w: 40, h: 52, sh: 7, nw: 13, nh: 20, color: '#efe6c0', alpha: .7, cap: '#1b1b1b', label: '#ffffff', lt: 'SWEET', ltc: '#b07a10' } },
+    { id: 'sour', name: 'Sour', shelf: 2, col: 3, glass: 'shot', liquid: '#dfe86a', weight: 0,
+      b: { w: 40, h: 52, sh: 7, nw: 13, nh: 20, color: '#cfe05a', alpha: .75, cap: '#1b1b1b', label: '#ffffff', lt: 'SOUR', ltc: '#4f7a10' } },
+
     // Dolna półka – softy, soki, syropy
-    { id: 'cola', name: 'Cola', shelf: 2, col: 0, glass: 'highball', liquid: '#3a1d0e', weight: 1.5,
+    { id: 'cola', name: 'Cola', shelf: 2, col: 4, glass: 'highball', liquid: '#3a1d0e', weight: 1.5,
       b: { w: 28, h: 50, sh: 14, nw: 11, nh: 14, color: '#3a1d0e', alpha: .9, cap: '#d32f2f', label: '#d32f2f', lt: 'COLA', ltc: '#ffffff' } },
-    { id: 'tonik', name: 'Tonik', shelf: 2, col: 1, glass: 'highball', liquid: '#eef8fb', weight: 1,
+    { id: 'tonik', name: 'Tonik', shelf: 2, col: 5, glass: 'highball', liquid: '#eef8fb', weight: 1,
       b: { w: 28, h: 50, sh: 14, nw: 11, nh: 14, color: '#cfe8ef', alpha: .55, cap: '#f9a825', label: '#f9a825', lt: 'TONIK', ltc: '#ffffff' } },
-    { id: 'sok_pom', name: 'Sok pomarańczowy', shelf: 2, col: 2, glass: 'highball', liquid: '#ff9800', weight: 1.5,
+    { id: 'sok_pom', name: 'Sok pomarańczowy', shelf: 2, col: 6, glass: 'highball', liquid: '#ff9800', weight: 1.5,
       b: { type: 'carton', w: 42, h: 64, color: '#ff9800', label: '#ffffff', lt: 'POMARAŃCZA', ltc: '#e65100' } },
-    { id: 'sok_jab', name: 'Sok jabłkowy', shelf: 2, col: 3, glass: 'highball', liquid: '#e8c547', weight: 1,
+    { id: 'sok_jab', name: 'Sok jabłkowy', shelf: 2, col: 7, glass: 'highball', liquid: '#e8c547', weight: 1,
       b: { type: 'carton', w: 42, h: 64, color: '#7cb342', label: '#ffffff', lt: 'JABŁKO', ltc: '#33691e' } },
-    { id: 'grenadyna', name: 'Syrop grenadyna', shelf: 2, col: 4, glass: 'shot', liquid: '#c2185b', weight: 0.8,
+    { id: 'grenadyna', name: 'Syrop grenadyna', shelf: 2, col: 8, glass: 'shot', liquid: '#c2185b', weight: 0.8,
       b: { w: 30, h: 52, sh: 8, nw: 11, nh: 16, color: '#b0103f', alpha: .85, cap: '#333333', label: '#ffffff', lt: 'SYROP', ltc: '#b0103f' } },
-    { id: 'woda', name: 'Woda gazowana', shelf: 2, col: 5, glass: 'highball', liquid: '#e3f2fd', weight: 1,
+    { id: 'woda', name: 'Woda gazowana', shelf: 2, col: 9, glass: 'highball', liquid: '#e3f2fd', weight: 1,
       b: { w: 32, h: 52, sh: 12, nw: 12, nh: 12, color: '#64b5f6', alpha: .45, cap: '#1565c0', label: '#1565c0', lt: 'WODA', ltc: '#ffffff' } },
 
     // Kran
     { id: 'piwo', name: 'Piwo', shelf: -1, col: TAP_COL, glass: 'pint', liquid: '#f2b01e', weight: 4 },
+
+    // Koktajle – robione w shakerze
+    { id: 'whiskey_sour', name: 'Whiskey Sour', shelf: -1, col: -1, glass: 'tumbler', liquid: '#e7c15a', weight: 1.3, cocktail: true },
+    { id: 'rum_sour', name: 'Rum Sour', shelf: -1, col: -1, glass: 'tumbler', liquid: '#d9a548', weight: 1.3, cocktail: true },
   ];
   const ITEM = Object.fromEntries(ITEMS.map(i => [i.id, i]));
   const GRID = [[], [], []];
   ITEMS.forEach(i => { if (i.shelf >= 0) GRID[i.shelf][i.col] = i; });
+
+  // Shaker i przepis na „sour”: shaker → lód → whisky/rum → sweet → sour → shake ×3
+  const SHAKER = { id: 'shaker', name: 'Shaker' };
+  const SOUR_BASE = { whisky: 'whiskey_sour', rum: 'rum_sour' };
+  const STEP_HINT = ['lód z wiaderka', 'whisky lub rum', 'sweet', 'sour'];
+  const STEP_NAME = { lod: 'lód', whisky: 'whisky', rum: 'rum', sweet: 'sweet', sour: 'sour' };
+  function stepOK(steps, id) {
+    switch (steps.length) {
+      case 0: return id === 'lod';
+      case 1: return id in SOUR_BASE;
+      case 2: return id === 'sweet';
+      case 3: return id === 'sour';
+      default: return false;
+    }
+  }
   const TOTAL_WEIGHT = ITEMS.reduce((s, i) => s + i.weight, 0);
 
   // ===================== Narzędzia =====================
@@ -161,6 +198,9 @@
       level: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'triangle', 0.1, 0, i * 0.1)),
       over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.25, 'triangle', 0.1, 0, i * 0.18)),
       deny: () => tone(200, 0.08, 'square', 0.04),
+      ice: () => { tone(2300, 0.05, 'triangle', 0.06); tone(2900, 0.05, 'triangle', 0.05, 0, 0.06); tone(2500, 0.05, 'triangle', 0.04, 0, 0.11); },
+      shake: () => noise(0.2, 0.09, 3200),
+      splash: () => noise(0.25, 0.06, 1400),
     };
   })();
 
@@ -175,7 +215,12 @@
     bt: null,
   };
   function newBartender() {
-    return { col: 3, x: COL_X[3], sel: 2, holding: null, busy: 0, busyKind: null, pick: null, queued: null };
+    return {
+      col: 5, x: COL_X[5], sel: 2, holding: null, busy: 0, busyKind: null, pick: null, queued: null,
+      shaker: null,   // { steps: [], shakes: 0, drink: null } gdy barman trzyma shaker
+      shakeAnim: 0,
+      addFrom: null,  // skąd sięga ręka przy dodawaniu składnika
+    };
   }
   S.bt = newBartender();
 
@@ -203,7 +248,7 @@
   }
   function pickOrder() {
     let r = Math.random() * TOTAL_WEIGHT;
-    for (const it of ITEMS) { r -= it.weight; if (r <= 0) return it; }
+    for (const it of ITEMS) { if (!it.weight) continue; r -= it.weight; if (r <= 0) return it; }
     return ITEM.piwo;
   }
   function activeCustomers() { return S.customers.filter(c => c.state === 'enter' || c.state === 'wait'); }
@@ -212,11 +257,13 @@
   function spawnCustomer() {
     const used = new Set(S.customers.filter(c => c.state !== 'leave').map(c => c.col));
     const free = [];
-    for (let i = 0; i < COLS; i++) if (!used.has(i)) free.push(i);
+    for (const i of SEATS) if (!used.has(i)) free.push(i);
     if (!free.length) return false;
     const p = params();
+    const item = pickOrder();
+    const patience = item.cocktail ? p.patience * 2.2 : p.patience; // koktajl wymaga wielu kroków
     S.customers.push({
-      col: pick(free), item: pickOrder(), patience: p.patience, max: p.patience,
+      col: pick(free), item, patience, max: patience,
       state: 'enter', t: 0, look: randomLook(), msg: '', glass: null,
     });
     sfx.arrive();
@@ -241,35 +288,90 @@
     }
   }
 
+  function deny(msg) { toast(msg); sfx.deny(); }
+
   function doUse() {
     const b = S.bt;
+    const kind = COLUMNS[b.col].kind;
+
+    // --- z shakerem w ręce ---
+    if (b.holding === SHAKER) {
+      const sh = b.shaker;
+      if (sh.drink) { // gotowy koktajl
+        const c = customerAt(b.col);
+        if (c) serve(c); else deny(`Podejdź do klienta i podaj ${sh.drink.name}`);
+        return;
+      }
+      if (sh.steps.length === STEP_HINT.length) { doShake(); return; }
+
+      let id = null;
+      if (kind === 'ice') id = 'lod';
+      else if (kind === 'shelf') {
+        const it = GRID[b.sel][b.col];
+        if (!it) { deny('Tu nie ma butelki'); return; }
+        id = it.id;
+      } else if (kind === 'shaker') { deny('Shaker już masz w ręce'); return; }
+      else { deny('Z shakerem nie nalejesz piwa – odłóż go (X)'); return; }
+
+      if (!stepOK(sh.steps, id)) { deny(`Zła kolejność! Teraz: ${STEP_HINT[sh.steps.length]}`); return; }
+      sh.steps.push(id);
+      b.busy = ADD_TIME; b.busyKind = 'add';
+      b.addFrom = kind === 'ice' ? { x: COL_X[ICE_COL], y: 474 } : { x: b.x + 32, y: 392 };
+      floatText(b.x, 380, `+ ${STEP_NAME[id]}`, '#ffe6b8');
+      if (id === 'lod') sfx.ice(); else sfx.splash();
+      if (sh.steps.length === STEP_HINT.length) toast('Teraz shake, shake, shake! (Spacja ×3)');
+      return;
+    }
+
+    // --- z butelką / piwem w ręce ---
     if (b.holding) {
       const c = customerAt(b.col);
       if (c) serve(c);
-      else { toast('Podejdź do klienta, żeby podać (X – odłóż)'); sfx.deny(); }
+      else if (kind === 'shaker' || kind === 'ice') deny('Najpierw odłóż to, co trzymasz (X)');
+      else deny('Podejdź do klienta, żeby podać (X – odłóż)');
       return;
     }
-    if (b.col === TAP_COL) {
-      b.busy = POUR_TIME; b.busyKind = 'pour'; sfx.pour();
+
+    // --- puste ręce ---
+    if (kind === 'tap') { b.busy = POUR_TIME; b.busyKind = 'pour'; sfx.pour(); return; }
+    if (kind === 'shaker') {
+      b.holding = SHAKER;
+      b.shaker = { steps: [], shakes: 0, drink: null };
+      sfx.pick();
       return;
     }
+    if (kind === 'ice') { deny('Najpierw weź shaker'); return; }
     const it = GRID[b.sel][b.col];
+    if (!it) { deny('Tu nie ma butelki'); return; }
     b.holding = it;
     b.pick = { it, t: 0 };
     sfx.pick();
   }
 
+  function doShake() {
+    const b = S.bt, sh = b.shaker;
+    sh.shakes++;
+    b.shakeAnim = SHAKE_TIME; // sama animacja – nie blokuje kolejnych wciśnięć
+    floatText(b.x + (sh.shakes - 2) * 40, 370, 'SHAKE!', '#9be7ff');
+    sfx.shake();
+    if (sh.shakes >= SHAKES_NEEDED) {
+      sh.drink = ITEM[SOUR_BASE[sh.steps[1]]];
+      toast(`${sh.drink.name} gotowy – podaj klientowi!`);
+    }
+  }
+
   function doDrop() {
     const b = S.bt;
     if (!b.holding) return;
-    b.holding = null; b.pick = null;
+    if (b.holding === SHAKER) toast(b.shaker.steps.length ? 'Shaker wylany i odstawiony' : 'Shaker odstawiony');
+    b.holding = null; b.pick = null; b.shaker = null;
     sfx.drop();
   }
 
   function serve(c) {
     const b = S.bt;
-    const given = b.holding;
-    b.holding = null; b.pick = null;
+    const given = b.holding === SHAKER ? b.shaker.drink : b.holding;
+    b.holding = null; b.pick = null; b.shaker = null;
     c.glass = given;
     c.t = 0;
     const x = COL_X[c.col];
@@ -278,7 +380,8 @@
       S.bestStreak = Math.max(S.bestStreak, S.streak);
       const frac = c.patience / c.max;
       const mult = 1 + Math.min(S.streak - 1, 5) * 0.1;
-      const pts = Math.round((50 + 100 * frac) * mult);
+      const base = given.cocktail ? 120 : 50, speed = given.cocktail ? 180 : 100;
+      const pts = Math.round((base + speed * frac) * mult);
       S.score += pts; S.served++;
       c.state = 'happy'; c.msg = frac > 0.66 ? 'Ekspres!' : 'Dzięki!';
       floatText(x, 470, `+${pts}`, '#7dff9a');
@@ -349,6 +452,7 @@
     b.x = Math.abs(d) <= step ? tx : b.x + Math.sign(d) * step;
 
     if (b.pick) { b.pick.t += dt; if (b.pick.t >= PICK_TIME) b.pick = null; }
+    if (b.shakeAnim > 0) b.shakeAnim = Math.max(0, b.shakeAnim - dt);
     if (b.busy > 0) {
       b.busy -= dt;
       if (b.busy <= 0) {
@@ -533,6 +637,68 @@
     g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
   }
 
+  // Shaker (typu cobbler): korpus, sitko, kapturek
+  function drawShaker(g, x, by, s = 1, state = null) {
+    g.save();
+    g.translate(x, by);
+    g.scale(s, s);
+    const metal = g.createLinearGradient(-20, 0, 20, 0);
+    metal.addColorStop(0, '#7b848c'); metal.addColorStop(0.4, '#f4f8fa');
+    metal.addColorStop(0.6, '#c9d1d7'); metal.addColorStop(1, '#6d757c');
+    g.fillStyle = metal;
+    g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1.5;
+    // korpus
+    g.beginPath(); g.moveTo(-15, 0); g.lineTo(15, 0); g.lineTo(19, -46); g.lineTo(-19, -46); g.closePath(); g.fill(); g.stroke();
+    // sitko
+    g.beginPath(); g.moveTo(-19, -46); g.lineTo(19, -46); g.lineTo(11, -64); g.lineTo(-11, -64); g.closePath(); g.fill(); g.stroke();
+    // kapturek
+    rr(g, -8, -76, 16, 13, 4); g.fill(); g.stroke();
+    // obręcze
+    g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(-19, -48, 38, 3); g.fillRect(-11, -66, 22, 2);
+    // połysk
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(-9, -42, 3, 36);
+    // wskaźnik napełnienia (kropki = dodane składniki, ✓ = gotowe)
+    if (state) {
+      const n = STEP_HINT.length;
+      for (let i = 0; i < n; i++) {
+        g.fillStyle = i < state.steps.length ? '#7dff9a' : 'rgba(0,0,0,.35)';
+        g.beginPath(); g.arc(-10.5 + i * 7, -20, 2.6, 0, Math.PI * 2); g.fill();
+      }
+    }
+    g.restore();
+  }
+
+  // Wiaderko z lodem
+  function drawIceBucket(g, x, by) {
+    g.save();
+    g.translate(x, by);
+    // kostki lodu wystające ponad krawędź
+    const cubes = [[-20, -46], [-6, -50], [8, -47], [20, -44], [-13, -42], [2, -43], [14, -40]];
+    for (const [cx, cy] of cubes) {
+      g.fillStyle = 'rgba(225,245,255,.92)'; rr(g, cx - 7, cy - 7, 14, 14, 3); g.fill();
+      g.strokeStyle = 'rgba(120,170,200,.8)'; g.lineWidth = 1; g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(cx - 4, cy - 4, 4, 3);
+    }
+    const metal = g.createLinearGradient(-32, 0, 32, 0);
+    metal.addColorStop(0, '#6d757c'); metal.addColorStop(0.35, '#eef3f6'); metal.addColorStop(1, '#7a8288');
+    g.fillStyle = metal; g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(-25, 0); g.lineTo(25, 0); g.lineTo(31, -38); g.lineTo(-31, -38); g.closePath(); g.fill(); g.stroke();
+    rr(g, -33, -41, 66, 6, 3); g.fill(); g.stroke();
+    // uchwyty
+    g.strokeStyle = '#8a9198'; g.lineWidth = 3;
+    g.beginPath(); g.arc(-31, -26, 6, Math.PI * 0.5, Math.PI * 1.5); g.stroke();
+    g.beginPath(); g.arc(31, -26, 6, -Math.PI * 0.5, Math.PI * 0.5); g.stroke();
+    g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(-27, -20, 54, 2);
+    g.fillStyle = '#2c3e50'; g.font = `800 10px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('LÓD', 0, -11);
+    g.restore();
+  }
+
+  function drawStations(g) {
+    if (S.bt.holding !== SHAKER) drawShaker(g, COL_X[SHAKER_COL], GLASS_BASE, 1);
+    drawIceBucket(g, COL_X[ICE_COL], GLASS_BASE);
+  }
+
   function drawBartender(g) {
     const b = S.bt, x = b.x;
     const headY = 410 + Math.sin(S.time * 3) * 1.2;
@@ -540,10 +706,23 @@
     const skin = '#f0c49a';
 
     let L = { x: x - 34, y: 482 }, R = { x: x + 34, y: 482 };
-    const pouring = b.busyKind === 'pour' && b.busy > 0;
-    if (pouring) R = { x: TAP_X - 4, y: 352 + (1 - b.busy / POUR_TIME) * 10 };
+    const busy = b.busy > 0 ? b.busyKind : null;
+    const hasShaker = b.holding === SHAKER;
+    let shakerPos = null;
+    if (hasShaker) { L = { x: x - 30, y: 466 }; shakerPos = { x: L.x, y: L.y + 16 }; }
+
+    if (busy === 'pour') R = { x: TAP_X - 4, y: 352 + (1 - b.busy / POUR_TIME) * 10 };
+    else if (b.shakeAnim > 0 && hasShaker) {
+      const a = S.time * 48;
+      const sx = x + 34 + Math.sin(a) * 10, sy = 398 + Math.cos(a) * 8;
+      L = { x: sx - 2, y: sy + 34 }; R = { x: sx + 2, y: sy - 4 };
+      shakerPos = { x: sx, y: sy + 40 };
+    } else if (busy === 'add' && b.addFrom) {
+      const k = 1 - b.busy / ADD_TIME, ph = easeOut(k < 0.5 ? k * 2 : (1 - k) * 2);
+      R = { x: lerp(x + 34, b.addFrom.x, ph), y: lerp(468, b.addFrom.y, ph) };
+    }
     else if (b.pick) R = { x: x + 32, y: lerp(392, 468, easeOut(b.pick.t / PICK_TIME)) };
-    else if (b.holding) R = { x: x + 32, y: 468 };
+    else if (b.holding && !hasShaker) R = { x: x + 32, y: 468 };
 
     // szyja + tułów
     g.fillStyle = skin; g.fillRect(x - 7, headY + 16, 14, 18);
@@ -582,6 +761,8 @@
       const it = b.pick.it, k = easeOut(b.pick.t / PICK_TIME);
       const px = lerp(COL_X[it.col], R.x, k), py = lerp(SHELF_Y[it.shelf], R.y + 14, k);
       drawHeldItem(g, it, px, py, lerp(1, 0.62, k));
+    } else if (hasShaker) {
+      drawShaker(g, shakerPos.x, shakerPos.y, 0.72, b.shaker);
     } else if (b.holding) {
       drawHeldItem(g, b.holding, R.x, R.y + 14, 0.62);
     }
@@ -629,19 +810,30 @@
     }
   }
 
-  function drawSelection(g, tapOnly) {
+  // Podświetlenie tego, co barman może teraz wziąć / użyć.
+  // layer: 'shelf' (rysowane przed barmanem) albo 'bar' (po blacie – kran, shaker, lód)
+  function drawSelection(g, layer) {
     const b = S.bt;
-    if (S.mode === 'over' || b.holding || b.busy > 0) return;
-    const atTap = b.col === TAP_COL;
-    if (tapOnly !== atTap) return;
+    if (S.mode === 'over' || b.busy > 0) return;
+    const withShaker = b.holding === SHAKER;
+    if (b.holding && !(withShaker && b.shaker.steps.length < STEP_HINT.length)) return;
+    const kind = COLUMNS[b.col].kind;
+    const x = COL_X[b.col];
+    let box = null;
+    if (layer === 'shelf' && kind === 'shelf') box = [x - 44, SHELF_Y[b.sel] - 102, 88, 104];
+    if (layer === 'bar') {
+      if (kind === 'tap' && !withShaker) box = [TAP_X - 28, 326, 56, 176];
+      if (kind === 'shaker' && !withShaker) box = [x - 28, 410, 56, 92];
+      if (kind === 'ice' && withShaker) box = [x - 40, 434, 80, 68];
+    }
+    if (!box) return;
     const pulse = 0.5 + 0.5 * Math.sin(S.time * 6);
     g.save();
     g.strokeStyle = `rgba(255,214,90,${0.55 + 0.45 * pulse})`;
     g.lineWidth = 3;
     g.shadowColor = 'rgba(255,190,60,.95)';
     g.shadowBlur = 16;
-    if (atTap) rr(g, TAP_X - 28, 326, 56, 176, 10);
-    else rr(g, COL_X[b.col] - 44, SHELF_Y[b.sel] - 102, 88, 104, 10);
+    rr(g, box[0], box[1], box[2], box[3], 10);
     g.stroke();
     g.restore();
   }
@@ -682,7 +874,8 @@
 
   function drawBubble(g, c) {
     if (c.state === 'leave') return;
-    const x = COL_X[c.col];
+    const tailX = COL_X[c.col];
+    let x = tailX;
     const off = c.state === 'enter' ? (1 - easeOut(c.t / 0.45)) * 170 : 0;
     const cy = 552 + off;
     let text, color = '#2a1608', bg = '#fffaf0';
@@ -693,12 +886,13 @@
     const size = fitFont(g, text, 150, 17);
     const tw = g.measureText(text).width;
     const w = Math.max(112, tw + 26), h = 50;
+    x = Math.min(W - w / 2 - 6, Math.max(w / 2 + 6, x)); // nie wychodź poza ekran
     g.save();
     g.shadowColor = 'rgba(0,0,0,.4)'; g.shadowBlur = 8; g.shadowOffsetY = 2;
     g.fillStyle = bg;
     rr(g, x - w / 2, cy - h / 2, w, h, 12); g.fill();
     g.shadowColor = 'transparent';
-    g.beginPath(); g.moveTo(x - 9, cy + h / 2 - 1); g.lineTo(x, cy + h / 2 + 10); g.lineTo(x + 9, cy + h / 2 - 1); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(tailX - 9, cy + h / 2 - 1); g.lineTo(tailX, cy + h / 2 + 10); g.lineTo(tailX + 9, cy + h / 2 - 1); g.closePath(); g.fill();
     g.fillStyle = color;
     g.font = `700 ${size}px ${FONT}`;
     g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -737,7 +931,14 @@
     g.textAlign = 'left';
     g.font = `600 17px ${FONT}`;
     g.fillStyle = '#c9a77a';
-    const held = S.bt.holding ? S.bt.holding.name : (S.bt.busyKind === 'pour' ? 'nalewam…' : '—');
+    const b = S.bt;
+    let held = b.holding ? b.holding.name : (b.busyKind === 'pour' ? 'nalewam…' : '—');
+    if (b.holding === SHAKER) {
+      const sh = b.shaker;
+      if (sh.drink) held = `Shaker – ${sh.drink.name} ✓`;
+      else if (sh.steps.length === STEP_HINT.length) held = `Shaker – shake ${sh.shakes}/${SHAKES_NEEDED}`;
+      else held = `Shaker: ${sh.steps.map(s => STEP_NAME[s]).join(' + ') || 'pusty'}`;
+    }
     g.fillText(`W ręce: ${held}`, 730, 20);
 
     g.textAlign = 'right';
@@ -774,6 +975,37 @@
   }
 
   // ===================== Warstwy statyczne =====================
+  function drawGlassStack(g, x, by) {
+    // piramida odwróconych szklanek
+    const pos = [[-22, 0], [0, 0], [22, 0], [-11, -30], [11, -30], [0, -60]];
+    for (const [dx, dy] of pos) {
+      g.save();
+      g.translate(x + dx, by + dy - 30);
+      g.scale(0.62, -0.95);
+      g.beginPath(); GLASSES.tumbler.path(g);
+      g.fillStyle = 'rgba(220,235,255,.18)'; g.fill();
+      g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2; g.stroke();
+      g.restore();
+    }
+  }
+
+  function drawFruitBowl(g, x, by, color, dark) {
+    const fruits = [[-18, -14], [0, -18], [18, -14], [-9, -26], [9, -26]];
+    for (const [dx, dy] of fruits) {
+      g.fillStyle = color;
+      g.beginPath(); g.ellipse(x + dx, by + dy, 11, 9, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = dark; g.lineWidth = 1; g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.4)';
+      g.beginPath(); g.arc(x + dx - 4, by + dy - 3, 2.5, 0, Math.PI * 2); g.fill();
+    }
+    // misa
+    const gr = g.createLinearGradient(0, by - 20, 0, by);
+    gr.addColorStop(0, '#d8d2c4'); gr.addColorStop(1, '#8c8473');
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(x - 36, by - 18); g.quadraticCurveTo(x, by + 14, x + 36, by - 18); g.closePath(); g.fill();
+    g.fillRect(x - 12, by - 4, 24, 4);
+  }
+
   function buildBackground() {
     const L = layer(), g = L.getContext('2d');
     const rnd = mulberry32(42);
@@ -827,10 +1059,22 @@
         gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = gr; g.fillRect(cx, y + 14, cw, 12);
       }
-      g.font = `700 10px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = '#ffeacb';
-      for (let c = 0; c < SHELF_COLS; c++) g.fillText(GRID[s][c].name.toUpperCase(), COL_X[c], y + 8);
+      for (let c = 0; c < COLS; c++) {
+        const it = GRID[s][c];
+        if (!it) continue;
+        const name = it.name.toUpperCase();
+        fitFont(g, name, 90, 10);
+        g.fillText(name, COL_X[c], y + 8);
+      }
     }
+
+    // dekoracje nad sweet/sour: szklanki i owoce
+    drawGlassStack(g, COL_X[2], SHELF_Y[0]);
+    drawGlassStack(g, COL_X[3], SHELF_Y[0]);
+    drawFruitBowl(g, COL_X[2], SHELF_Y[1], '#f7d933', '#c9a800');   // cytryny
+    drawFruitBowl(g, COL_X[3], SHELF_Y[1], '#8bc34a', '#5a8a1f');   // limonki
 
     // ściana za barmanem
     g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, cy + ch + 12, W, wallBottom - (cy + ch + 12));
@@ -847,6 +1091,18 @@
     g.shadowBlur = 0;
     g.lineWidth = 1.5; g.strokeStyle = '#6b4a08'; g.strokeText('PSOTA', 1140, 100);
     g.restore();
+
+    // tablica z przepisem (lewa strona, nad shakerem i lodem)
+    g.fillStyle = '#5a3418'; rr(g, 8, 52, 192, 300, 8); g.fill();
+    g.fillStyle = '#1f2a24'; rr(g, 17, 61, 174, 282, 4); g.fill();
+    g.fillStyle = '#ffe08a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `800 17px ${FONT}`; g.fillText('WHISKEY SOUR', 104, 84);
+    g.font = `800 14px ${FONT}`; g.fillText('lub RUM SOUR', 104, 104);
+    g.fillStyle = '#e8efe9'; g.textAlign = 'left'; g.font = `500 14px ${FONT}`;
+    ['1. weź shaker', '2. lód z wiaderka', '3. whisky albo rum', '4. sweet', '5. sour', '6. shake ×3 (Spacja)', '7. podaj klientowi']
+      .forEach((t, i) => g.fillText(t, 28, 136 + i * 28));
+    g.strokeStyle = 'rgba(232,239,233,.35)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(30, 118); g.lineTo(178, 118); g.stroke();
 
     // tablica kredowa
     g.fillStyle = '#5a3418'; rr(g, 1014, 158, 252, 174, 8); g.fill();
@@ -922,11 +1178,12 @@
       if (it.shelf < 0 || it === away) continue;
       drawBottle(g, COL_X[it.col], SHELF_Y[it.shelf], it);
     }
-    drawSelection(g, false);
+    drawSelection(g, 'shelf');
     drawBartender(g);
     g.drawImage(BAR, 0, 0);
     drawTap(g);
-    drawSelection(g, true);
+    drawStations(g);
+    drawSelection(g, 'bar');
 
     for (const c of S.customers) drawCustomer(g, c);
     for (const c of S.customers) drawBubble(g, c);
