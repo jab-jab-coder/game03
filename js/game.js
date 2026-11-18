@@ -148,8 +148,10 @@
   }
 
   // ===================== Pamięć (rekord) =====================
-  function loadBest() { try { return parseInt(localStorage.getItem('barman.best') || '0', 10) || 0; } catch (e) { return 0; } }
-  function saveBest(v) { try { localStorage.setItem('barman.best', String(v)); } catch (e) { /* brak dostępu */ } }
+  // osobny rekord dla gry solo i we dwoje
+  const bestKey = players => (players === 2 ? 'barman.best2' : 'barman.best');
+  function loadBest(players = 1) { try { return parseInt(localStorage.getItem(bestKey(players)) || '0', 10) || 0; } catch (e) { return 0; } }
+  function saveBest(v, players = 1) { try { localStorage.setItem(bestKey(players), String(v)); } catch (e) { /* brak dostępu */ } }
 
   // ===================== Dźwięk (WebAudio) =====================
   const sfx = (() => {
@@ -211,27 +213,44 @@
     mode: 'menu',          // menu | playing | paused | over
     time: 0,
     score: 0, lives: MAX_LIVES, level: 1, served: 0, streak: 0, bestStreak: 0,
-    best: loadBest(),
+    best: 0,
     spawnT: 0, overDelay: 0, overTime: 0,
     customers: [], floats: [], toast: null,
-    bt: null,
+    players: loadPlayers(), // 1 albo 2
+    bts: [],                // barmani: [0] barman, [1] barmanka (w trybie 2 graczy)
   };
-  function newBartender() {
+
+  // Postacie za barem
+  const STAFF = [
+    { name: 'Barman', woman: false, color: '#ffd65a' },
+    { name: 'Barmanka', woman: true, color: '#ff7ac8' },
+  ];
+
+  function newBartender(idx, col) {
     return {
-      col: 5, x: COL_X[5], sel: 2, holding: null, busy: 0, busyKind: null, pick: null, queued: null,
-      shaker: null,   // { steps: [], shakes: 0, drink: null } gdy barman trzyma shaker
+      idx, ...STAFF[idx],
+      col, x: COL_X[col], sel: 2, holding: null, busy: 0, busyKind: null, pick: null, queued: null,
+      shaker: null,   // { steps: [], shakes: 0, drink: null } gdy trzyma shaker
       shakeAnim: 0,
       addFrom: null,  // skąd sięga ręka przy dodawaniu składnika
+      drawX: COL_X[col],
     };
   }
-  S.bt = newBartender();
+  function resetStaff() {
+    S.bts = S.players === 2 ? [newBartender(0, 3), newBartender(1, 7)] : [newBartender(0, 5)];
+  }
+  function loadPlayers() { try { return localStorage.getItem('barman.players') === '2' ? 2 : 1; } catch (e) { return 1; } }
+  function savePlayers(n) { try { localStorage.setItem('barman.players', String(n)); } catch (e) { /* brak dostępu */ } }
+  resetStaff();
+  S.best = loadBest(S.players);
 
   function params() {
-    const L = S.level;
+    const L = S.level, duo = S.players === 2;
     return {
       patience: Math.max(7, 20 - (L - 1) * 1.6),
-      spawnEvery: Math.max(1.4, 4.6 - (L - 1) * 0.4),
-      maxCustomers: Math.min(5, 1 + Math.ceil(L / 2)),
+      spawnEvery: Math.max(duo ? 1.0 : 1.4, (4.6 - (L - 1) * 0.4) * (duo ? 0.7 : 1)),
+      maxCustomers: Math.min(duo ? 6 : 5, 1 + Math.ceil(L / 2) + (duo ? 1 : 0)),
+      servesPerLevel: duo ? 9 : SERVES_PER_LEVEL,
     };
   }
 
@@ -273,8 +292,9 @@
   }
 
   // ===================== Akcje gracza =====================
-  function input(a) {
-    const b = S.bt;
+  function input(a, player = 0) {
+    const b = S.bts[player];
+    if (!b) return;
     if (a === 'left' || a === 'right') {
       if (b.busy > 0) return;
       const nc = b.col + (a === 'left' ? -1 : 1);
@@ -290,10 +310,12 @@
     }
   }
 
-  function deny(msg) { toast(msg); sfx.deny(); }
+  // W trybie 2 graczy komunikaty mówią, kogo dotyczą
+  function who(b, msg) { return S.players === 2 ? `${b.name}: ${msg}` : msg; }
+  function deny(b, msg) { toast(who(b, msg)); sfx.deny(); }
+  function shakersInUse() { return S.bts.filter(o => o.holding === SHAKER).length; }
 
-  function doUse() {
-    const b = S.bt;
+  function doUse(b) {
     const kind = COLUMNS[b.col].kind;
 
     // --- z shakerem w ręce ---
@@ -301,77 +323,84 @@
       const sh = b.shaker;
       if (sh.drink) { // gotowy koktajl
         const c = customerAt(b.col);
-        if (c) serve(c); else deny(`Podejdź do klienta i podaj ${sh.drink.name}`);
+        if (c) serve(b, c); else deny(b, `Podejdź do klienta i podaj ${sh.drink.name}`);
         return;
       }
-      if (sh.steps.length === STEP_HINT.length) { doShake(); return; }
+      if (sh.steps.length === STEP_HINT.length) { doShake(b); return; }
 
       let id = null;
       if (kind === 'ice') id = 'lod';
       else if (kind === 'shelf') {
         const it = GRID[b.sel][b.col];
-        if (!it) { deny('Tu nie ma butelki'); return; }
+        if (!it) { deny(b, 'Tu nie ma butelki'); return; }
         id = it.id;
-      } else if (kind === 'shaker') { deny('Shaker już masz w ręce'); return; }
-      else { deny('Z shakerem nie nalejesz piwa – odłóż go (X)'); return; }
+      } else if (kind === 'shaker') { deny(b, 'Shaker już masz w ręce'); return; }
+      else { deny(b, 'Z shakerem nie nalejesz piwa – odłóż go'); return; }
 
-      if (!stepOK(sh.steps, id)) { deny(`Zła kolejność! Teraz: ${STEP_HINT[sh.steps.length]}`); return; }
+      if (!stepOK(sh.steps, id)) { deny(b, `Zła kolejność! Teraz: ${STEP_HINT[sh.steps.length]}`); return; }
       sh.steps.push(id);
       b.busy = ADD_TIME; b.busyKind = 'add';
       b.addFrom = kind === 'ice' ? { x: COL_X[ICE_COL], y: 474 } : { x: b.x + 32, y: 392 };
       floatText(b.x, 380, `+ ${STEP_NAME[id]}`, '#ffe6b8');
       if (id === 'lod') sfx.ice(); else sfx.splash();
-      if (sh.steps.length === STEP_HINT.length) toast('Teraz shake, shake, shake! (Spacja ×3)');
+      if (sh.steps.length === STEP_HINT.length) toast(who(b, 'teraz shake, shake, shake! (×3)'));
       return;
     }
 
     // --- z butelką / piwem w ręce ---
     if (b.holding) {
       const c = customerAt(b.col);
-      if (c) serve(c);
-      else if (kind === 'shaker' || kind === 'ice') deny('Najpierw odłóż to, co trzymasz (X)');
-      else deny('Podejdź do klienta, żeby podać (X – odłóż)');
+      if (c) serve(b, c);
+      else if (kind === 'shaker' || kind === 'ice') deny(b, 'Najpierw odłóż to, co trzymasz');
+      else deny(b, 'Podejdź do klienta, żeby podać (albo odłóż)');
       return;
     }
 
     // --- puste ręce ---
-    if (kind === 'tap') { b.busy = POUR_TIME; b.busyKind = 'pour'; sfx.pour(); return; }
+    if (kind === 'tap') {
+      if (S.bts.some(o => o !== b && o.busyKind === 'pour')) { deny(b, 'Kran zajęty – chwilę!'); return; }
+      b.busy = POUR_TIME; b.busyKind = 'pour'; sfx.pour();
+      return;
+    }
     if (kind === 'shaker') {
+      if (shakersInUse() >= S.players) { deny(b, 'Shaker zajęty'); return; }
       b.holding = SHAKER;
       b.shaker = { steps: [], shakes: 0, drink: null };
       sfx.pick();
       return;
     }
-    if (kind === 'ice') { deny('Najpierw weź shaker'); return; }
+    if (kind === 'ice') { deny(b, 'Najpierw weź shaker'); return; }
     const it = GRID[b.sel][b.col];
-    if (!it) { deny('Tu nie ma butelki'); return; }
+    if (!it) { deny(b, 'Tu nie ma butelki'); return; }
+    if (S.bts.some(o => o !== b && o.holding === it)) {
+      deny(b, `${it.name} jest u ${b.idx === 0 ? 'barmanki' : 'barmana'}`);
+      return;
+    }
     b.holding = it;
     b.pick = { it, t: 0 };
     sfx.pick();
   }
 
-  function doShake() {
-    const b = S.bt, sh = b.shaker;
+  function doShake(b) {
+    const sh = b.shaker;
     sh.shakes++;
     b.shakeAnim = SHAKE_TIME; // sama animacja – nie blokuje kolejnych wciśnięć
     floatText(b.x + (sh.shakes - 2) * 40, 370, 'SHAKE!', '#9be7ff');
     sfx.shake();
     if (sh.shakes >= SHAKES_NEEDED) {
       sh.drink = ITEM[SOUR_BASE[sh.steps[1]]];
-      toast(`${sh.drink.name} gotowy – podaj klientowi!`);
+      toast(who(b, `${sh.drink.name} gotowy – podaj klientowi!`));
     }
   }
 
-  function doDrop() {
-    const b = S.bt;
+  function doDrop(b) {
     if (!b.holding) return;
-    if (b.holding === SHAKER) toast(b.shaker.steps.length ? 'Shaker wylany i odstawiony' : 'Shaker odstawiony');
+    if (b.holding === SHAKER) toast(who(b, b.shaker.steps.length ? 'shaker wylany i odstawiony' : 'shaker odstawiony'));
     b.holding = null; b.pick = null; b.shaker = null;
     sfx.drop();
   }
 
-  function serve(c) {
-    const b = S.bt;
+  function serve(b, c) {
     const given = b.holding === SHAKER ? b.shaker.drink : b.holding;
     b.holding = null; b.pick = null; b.shaker = null;
     c.glass = given;
@@ -389,7 +418,7 @@
       floatText(x, 470, `+${pts}`, '#7dff9a');
       if (S.streak > 1) floatText(x, 440, `Combo ×${S.streak}`, '#ffd25a');
       sfx.good();
-      if (S.served % SERVES_PER_LEVEL === 0) levelUp();
+      if (S.served % params().servesPerLevel === 0) levelUp();
     } else {
       S.streak = 0;
       S.score = Math.max(0, S.score - 25);
@@ -422,17 +451,18 @@
     sfx.unlock();
     Object.assign(S, {
       mode: 'playing', score: 0, lives: MAX_LIVES, level: 1, served: 0, streak: 0, bestStreak: 0,
-      spawnT: 0.8, overDelay: 0, customers: [], floats: [], toast: null, bt: newBartender(),
+      spawnT: 0.8, overDelay: 0, customers: [], floats: [], toast: null,
     });
+    resetStaff();
     showPanel(null);
-    toast('Zmiana rozpoczęta – obsługuj klientów!');
+    toast(S.players === 2 ? 'Zmiana we dwoje – barman i barmanka, do dzieła!' : 'Zmiana rozpoczęta – obsługuj klientów!');
   }
 
   function endGame() {
     S.mode = 'over';
     S.overTime = S.time;
     const newBest = S.score > S.best;
-    if (newBest) { S.best = S.score; saveBest(S.best); }
+    if (newBest) { S.best = S.score; saveBest(S.best, S.players); }
     document.getElementById('over-score').textContent = S.score;
     document.getElementById('over-served').textContent = S.served;
     document.getElementById('over-level').textContent = S.level;
@@ -446,10 +476,7 @@
     else if (S.mode === 'paused') { S.mode = 'playing'; showPanel(null); }
   }
 
-  function update(dt) {
-    const b = S.bt;
-
-    // ruch barmana
+  function updateBartender(b, dt) {
     const tx = COL_X[b.col], d = tx - b.x, step = MOVE_SPEED * dt;
     b.x = Math.abs(d) <= step ? tx : b.x + Math.sign(d) * step;
 
@@ -465,8 +492,26 @@
     }
     if (b.queued && b.x === tx && b.busy <= 0) {
       const a = b.queued; b.queued = null;
-      if (a === 'use') doUse(); else doDrop();
+      if (a === 'use') doUse(b); else doDrop(b);
     }
+  }
+
+  // Gdy barman i barmanka stoją blisko siebie, rozsuń ich na rysunku
+  function updateDrawPositions(dt) {
+    const [a, b] = S.bts;
+    let offA = 0, offB = 0;
+    if (b && Math.abs(a.x - b.x) < 40) {
+      const sgn = a.idx < b.idx ? -1 : 1;
+      offA = 26 * sgn; offB = -26 * sgn;
+    }
+    const k = Math.min(1, dt * 14);
+    a.off = lerp(a.off || 0, offA, k); a.drawX = a.x + a.off;
+    if (b) { b.off = lerp(b.off || 0, offB, k); b.drawX = b.x + b.off; }
+  }
+
+  function update(dt) {
+    for (const b of S.bts) updateBartender(b, dt);
+    updateDrawPositions(dt);
 
     // klienci
     for (const c of S.customers) {
@@ -697,13 +742,16 @@
   }
 
   function drawStations(g) {
-    if (S.bt.holding !== SHAKER) drawShaker(g, COL_X[SHAKER_COL], GLASS_BASE, 1);
+    const free = S.players - shakersInUse();
+    const sx = COL_X[SHAKER_COL];
+    if (free >= 2) { drawShaker(g, sx - 15, GLASS_BASE, 0.9); drawShaker(g, sx + 17, GLASS_BASE, 0.9); }
+    else if (free === 1) drawShaker(g, sx, GLASS_BASE, 1);
     drawIceBucket(g, COL_X[ICE_COL], GLASS_BASE);
   }
 
-  function drawBartender(g) {
-    const b = S.bt, x = b.x;
-    const headY = 410 + Math.sin(S.time * 3) * 1.2;
+  function drawBartender(g, b) {
+    const x = b.drawX;
+    const headY = 410 + Math.sin(S.time * 3 + b.idx * 1.7) * 1.2;
     const shY = 446;
     const skin = '#f0c49a';
 
@@ -726,33 +774,72 @@
     else if (b.pick) R = { x: x + 32, y: lerp(392, 468, easeOut(b.pick.t / PICK_TIME)) };
     else if (b.holding && !hasShaker) R = { x: x + 32, y: 468 };
 
+    const woman = b.woman;
+    const hair = woman ? '#8a3a1c' : '#3a2416';
+
+    // długie włosy barmanki (za głową i na ramionach)
+    if (woman) {
+      g.fillStyle = hair;
+      rr(g, x - 27, headY - 20, 54, 74, 22); g.fill();
+    }
+
     // szyja + tułów
     g.fillStyle = skin; g.fillRect(x - 7, headY + 16, 14, 18);
     g.fillStyle = '#f4f1ea'; rr(g, x - 28, shY - 12, 56, 72, 14); g.fill();
-    g.fillStyle = '#1d1d22';
+    if (woman) { // pasma włosów na ramionach
+      g.fillStyle = hair;
+      rr(g, x - 28, shY - 14, 13, 30, 6); g.fill();
+      rr(g, x + 15, shY - 14, 13, 30, 6); g.fill();
+    }
+    g.fillStyle = woman ? '#4a1838' : '#1d1d22';
     g.beginPath(); g.moveTo(x - 28, shY - 4); g.lineTo(x - 5, shY + 34); g.lineTo(x - 5, shY + 60); g.lineTo(x - 28, shY + 60); g.closePath(); g.fill();
     g.beginPath(); g.moveTo(x + 28, shY - 4); g.lineTo(x + 5, shY + 34); g.lineTo(x + 5, shY + 60); g.lineTo(x + 28, shY + 60); g.closePath(); g.fill();
     // mucha
-    g.fillStyle = '#b3122a';
-    g.beginPath(); g.moveTo(x, shY - 8); g.lineTo(x - 11, shY - 14); g.lineTo(x - 11, shY - 2); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(x, shY - 8); g.lineTo(x + 11, shY - 14); g.lineTo(x + 11, shY - 2); g.closePath(); g.fill();
+    g.fillStyle = woman ? '#ff4f9a' : '#b3122a';
+    const bw = woman ? 8 : 11;
+    g.beginPath(); g.moveTo(x, shY - 8); g.lineTo(x - bw, shY - 13); g.lineTo(x - bw, shY - 3); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(x, shY - 8); g.lineTo(x + bw, shY - 13); g.lineTo(x + bw, shY - 3); g.closePath(); g.fill();
     g.beginPath(); g.arc(x, shY - 8, 3, 0, Math.PI * 2); g.fill();
 
     // głowa
     g.fillStyle = skin; g.beginPath(); g.arc(x, headY, 22, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#3a2416';
-    g.beginPath(); g.arc(x, headY - 3, 23, Math.PI, 0); g.closePath(); g.fill();
-    g.fillRect(x - 23, headY - 4, 5, 12); g.fillRect(x + 18, headY - 4, 5, 12);
+    g.fillStyle = hair;
+    if (woman) {
+      // grzywka z przedziałkiem
+      g.beginPath(); g.arc(x, headY - 2, 24, Math.PI * 1.02, Math.PI * 1.98); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(x - 24, headY - 4); g.quadraticCurveTo(x - 10, headY - 22, x + 4, headY - 9); g.lineTo(x + 2, headY - 20); g.closePath(); g.fill();
+      g.fillRect(x - 24, headY - 6, 6, 22); g.fillRect(x + 18, headY - 6, 6, 22);
+      // kolczyki
+      g.fillStyle = '#ffd34d';
+      g.beginPath(); g.arc(x - 21, headY + 13, 2.6, 0, Math.PI * 2); g.arc(x + 21, headY + 13, 2.6, 0, Math.PI * 2); g.fill();
+    } else {
+      g.beginPath(); g.arc(x, headY - 3, 23, Math.PI, 0); g.closePath(); g.fill();
+      g.fillRect(x - 23, headY - 4, 5, 12); g.fillRect(x + 18, headY - 4, 5, 12);
+    }
     // oczy (mrugnięcie)
-    const blink = (S.time % 4.2) < 0.12;
+    const blink = ((S.time + b.idx * 1.9) % 4.2) < 0.12;
     g.fillStyle = '#1b1b1b';
     if (blink) { g.fillRect(x - 11, headY + 2, 6, 2); g.fillRect(x + 5, headY + 2, 6, 2); }
-    else { g.beginPath(); g.arc(x - 8, headY + 3, 2.6, 0, Math.PI * 2); g.arc(x + 8, headY + 3, 2.6, 0, Math.PI * 2); g.fill(); }
-    // wąs i uśmiech
-    g.fillStyle = '#3a2416';
-    g.beginPath(); g.ellipse(x - 5, headY + 11, 6, 2.6, 0.2, 0, Math.PI * 2); g.ellipse(x + 5, headY + 11, 6, 2.6, -0.2, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#8a3b2a'; g.lineWidth = 1.5;
-    g.beginPath(); g.arc(x, headY + 12, 6, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+    else {
+      g.beginPath(); g.arc(x - 8, headY + 3, 2.6, 0, Math.PI * 2); g.arc(x + 8, headY + 3, 2.6, 0, Math.PI * 2); g.fill();
+      if (woman) { // rzęsy
+        g.strokeStyle = '#1b1b1b'; g.lineWidth = 1.3;
+        g.beginPath(); g.moveTo(x - 11, headY); g.lineTo(x - 13, headY - 2); g.moveTo(x + 11, headY); g.lineTo(x + 13, headY - 2); g.stroke();
+      }
+    }
+    if (woman) {
+      // rumieńce i usta
+      g.fillStyle = 'rgba(255,110,120,.35)';
+      g.beginPath(); g.arc(x - 13, headY + 9, 4, 0, Math.PI * 2); g.arc(x + 13, headY + 9, 4, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#d6284f';
+      g.beginPath(); g.ellipse(x, headY + 12, 5.5, 2.6, 0, 0, Math.PI * 2); g.fill();
+    } else {
+      // wąs i uśmiech
+      g.fillStyle = '#3a2416';
+      g.beginPath(); g.ellipse(x - 5, headY + 11, 6, 2.6, 0.2, 0, Math.PI * 2); g.ellipse(x + 5, headY + 11, 6, 2.6, -0.2, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#8a3b2a'; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(x, headY + 12, 6, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
+    }
 
     // ręce
     drawArm(g, x - 24, shY - 2, L.x, L.y);
@@ -772,11 +859,20 @@
     g.fillStyle = skin;
     g.beginPath(); g.arc(L.x, L.y, 6.5, 0, Math.PI * 2); g.fill();
     g.beginPath(); g.arc(R.x, R.y, 6.5, 0, Math.PI * 2); g.fill();
+
+    // w trybie 2 graczy – plakietka z numerem gracza nad głową
+    if (S.players === 2 && S.mode !== 'menu') {
+      const tag = `P${b.idx + 1}`;
+      g.font = `800 11px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = b.color; rr(g, x - 13, headY - 40, 26, 14, 7); g.fill();
+      g.fillStyle = '#1a0f08'; g.fillText(tag, x, headY - 33);
+    }
   }
 
   function drawTap(g) {
-    const x = TAP_X, b = S.bt;
-    const pouring = b.busyKind === 'pour' && b.busy > 0;
+    const x = TAP_X;
+    const b = S.bts.find(o => o.busyKind === 'pour' && o.busy > 0);
+    const pouring = !!b;
 
     // tacka ociekowa
     g.fillStyle = '#2b2b2e'; rr(g, x - 34, 486, 68, 11, 3); g.fill();
@@ -840,8 +936,7 @@
 
   // Podświetlenie tego, co barman może teraz wziąć / użyć.
   // layer: 'shelf' (rysowane przed barmanem) albo 'bar' (po blacie – kran, shaker, lód)
-  function drawSelection(g, layer) {
-    const b = S.bt;
+  function drawSelection(g, layer, b) {
     if (S.mode === 'over' || b.busy > 0) return;
     const withShaker = b.holding === SHAKER;
     if (b.holding && !(withShaker && b.shaker.steps.length < STEP_HINT.length)) return;
@@ -858,11 +953,14 @@
       if (kind === 'ice' && withShaker) box = [x - 40, 434, 80, 68];
     }
     if (!box) return;
-    const pulse = 0.5 + 0.5 * Math.sin(S.time * 6);
+    // gdy obie postacie zaznaczają to samo, druga ramka jest nieco większa
+    if (b.idx === 1) box = [box[0] - 4, box[1] - 4, box[2] + 8, box[3] + 8];
+    const pulse = 0.5 + 0.5 * Math.sin(S.time * 6 + b.idx);
     g.save();
-    g.strokeStyle = `rgba(255,214,90,${0.55 + 0.45 * pulse})`;
+    g.globalAlpha = 0.55 + 0.45 * pulse;
+    g.strokeStyle = b.color;
     g.lineWidth = 3;
-    g.shadowColor = 'rgba(255,190,60,.95)';
+    g.shadowColor = b.color;
     g.shadowBlur = 16;
     rr(g, box[0], box[1], box[2], box[3], 10);
     g.stroke();
@@ -960,21 +1058,35 @@
     }
 
     g.textAlign = 'left';
-    g.font = `600 17px ${FONT}`;
-    g.fillStyle = '#c9a77a';
-    const b = S.bt;
-    let held = b.holding ? b.holding.name : (b.busyKind === 'pour' ? 'nalewam…' : '—');
-    if (b.holding === SHAKER) {
-      const sh = b.shaker;
-      if (sh.drink) held = `Shaker – ${sh.drink.name} ✓`;
-      else if (sh.steps.length === STEP_HINT.length) held = `Shaker – shake ${sh.shakes}/${SHAKES_NEEDED}`;
-      else held = `Shaker: ${sh.steps.map(s => STEP_NAME[s]).join(' + ') || 'pusty'}`;
+    if (S.players === 2) {
+      // dwie linijki: co trzyma barman, co barmanka
+      g.font = `600 13px ${FONT}`;
+      S.bts.forEach((b, i) => {
+        g.fillStyle = b.color;
+        g.fillText(`${b.name}:`, 712, 11 + i * 17);
+        g.fillStyle = '#e8d6b8';
+        g.fillText(heldText(b), 712 + (i ? 72 : 58), 11 + i * 17);
+      });
+    } else {
+      g.font = `600 17px ${FONT}`;
+      g.fillStyle = '#c9a77a';
+      g.fillText(`W ręce: ${heldText(S.bts[0])}`, 730, 20);
     }
-    g.fillText(`W ręce: ${held}`, 730, 20);
 
     g.textAlign = 'right';
+    g.font = `600 17px ${FONT}`;
     g.fillStyle = '#c9a77a';
     g.fillText(`Rekord: ${Math.max(S.best, S.score)}`, W - 16, 20);
+  }
+
+  function heldText(b) {
+    if (b.holding === SHAKER) {
+      const sh = b.shaker;
+      if (sh.drink) return `Shaker – ${sh.drink.name} ✓`;
+      if (sh.steps.length === STEP_HINT.length) return `Shaker – shake ${sh.shakes}/${SHAKES_NEEDED}`;
+      return `Shaker: ${sh.steps.map(s => STEP_NAME[s]).join(' + ') || 'pusty'}`;
+    }
+    return b.holding ? b.holding.name : (b.busyKind === 'pour' ? 'nalewam…' : '—');
   }
 
   function drawFloats(g) {
@@ -1622,19 +1734,22 @@
     g.drawImage(BG, 0, 0);
 
     // butelki na półkach
-    const b = S.bt;
-    const away = b.pick ? b.pick.it : b.holding;
+    const away = new Set(S.bts.map(b => (b.pick ? b.pick.it : b.holding)));
     for (const it of ITEMS) {
-      if (it.shelf < 0 || it === away) continue;
+      if (it.shelf < 0 || away.has(it)) continue;
       drawBottle(g, COL_X[it.col], SHELF_Y[it.shelf], it, BOTTLE_S);
     }
-    if (thumb) { drawBartender(g); g.drawImage(BAR, 0, 0); drawTap(g); drawStations(g); return; }
-    drawSelection(g, 'shelf');
-    drawBartender(g);
+    if (thumb) {
+      for (const b of S.bts) drawBartender(g, b);
+      g.drawImage(BAR, 0, 0); drawTap(g); drawStations(g);
+      return;
+    }
+    for (const b of S.bts) drawSelection(g, 'shelf', b);
+    for (const b of S.bts) drawBartender(g, b);
     g.drawImage(BAR, 0, 0);
     drawTap(g);
     drawStations(g);
-    drawSelection(g, 'bar');
+    for (const b of S.bts) drawSelection(g, 'bar', b);
 
     for (const c of S.customers) drawCustomer(g, c);
     for (const c of S.customers) drawBubble(g, c);
@@ -1663,15 +1778,21 @@
     document.querySelectorAll('.best-val').forEach(e => { e.textContent = S.best; });
   }
 
-  const KEYMAP = {
-    ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-    ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
-    Space: 'use', Enter: 'use', KeyX: 'drop', Backspace: 'drop',
-    KeyP: 'pause', Escape: 'pause', KeyM: 'mute',
+  // Klawiatura. W trybie 1 gracza oba zestawy sterują barmanem.
+  // Gracz 1 (barman): strzałki, Enter – weź/podaj, Backspace / prawy Shift – odłóż
+  // Gracz 2 (barmanka): WSAD, Spacja / F – weź/podaj, Q / X – odłóż
+  const KEYS_P1 = {
+    ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+    Enter: 'use', NumpadEnter: 'use', Backspace: 'drop', ShiftRight: 'drop', Numpad0: 'drop',
   };
+  const KEYS_P2 = {
+    KeyA: 'left', KeyD: 'right', KeyW: 'up', KeyS: 'down',
+    Space: 'use', KeyF: 'use', KeyQ: 'drop', KeyX: 'drop', KeyG: 'drop',
+  };
+  const KEYS_ANY = { KeyP: 'pause', Escape: 'pause', KeyM: 'mute' };
 
-  // Wspólna obsługa akcji z klawiatury i gamepada
-  function action(a, repeat) {
+  // Wspólna obsługa akcji z klawiatury, padów i przycisków dotykowych
+  function action(a, repeat, player = 0) {
     if (a === 'mute') { if (!repeat) { const m = sfx.toggle(); toast(m ? 'Dźwięk wyłączony' : 'Dźwięk włączony'); } return; }
     if (S.mode === 'menu' && (a === 'left' || a === 'right')) {
       if (!repeat) {
@@ -1679,6 +1800,10 @@
         selectTheme(THEME_IDS[(i + THEME_IDS.length) % THEME_IDS.length]);
         sfx.tick();
       }
+      return;
+    }
+    if (S.mode === 'menu' && (a === 'up' || a === 'down')) {
+      if (!repeat) { selectPlayers(a === 'up' ? 1 : 2); sfx.tick(); }
       return;
     }
     if (S.mode === 'menu' || S.mode === 'over') {
@@ -1690,27 +1815,37 @@
     if (a === 'pause') { if (!repeat) togglePause(); return; }
     if (S.mode === 'paused') { if (a === 'use' && !repeat) togglePause(); return; }
     if (repeat && (a === 'use' || a === 'drop')) return;
-    input(a);
+    input(a, S.players === 2 ? player : 0);
   }
 
   window.addEventListener('keydown', e => {
-    const a = KEYMAP[e.code];
+    let a = KEYS_ANY[e.code], player = 0;
+    if (!a && KEYS_P1[e.code]) { a = KEYS_P1[e.code]; player = 0; }
+    if (!a && KEYS_P2[e.code]) { a = KEYS_P2[e.code]; player = 1; }
     if (!a) return;
     e.preventDefault();
-    action(a, e.repeat);
+    action(a, e.repeat, player);
   });
 
-  // ===================== Gamepad =====================
+  // ===================== Gamepady =====================
   // Standardowe mapowanie: 0=A, 1=B, 2=X, 8=Select/Back, 9=Start, 12-15=krzyżak.
-  const pad = { prev: {}, holdDir: null, holdT: 0 };
+  // 1 gracz: każdy pad steruje barmanem.
+  // 2 graczy: dwa pady → pierwszy barman, drugi barmanka; jeden pad → barmanka (barman na klawiaturze).
+  const padState = {};
   const PAD_REPEAT_DELAY = 0.3, PAD_REPEAT_RATE = 0.11, STICK = 0.5;
 
   function pollGamepad(dt) {
-    const list = navigator.getGamepads ? navigator.getGamepads() : [];
-    let gp = null;
-    for (const p of list) if (p && p.connected) { gp = p; break; }
-    if (!gp) { pad.prev = {}; pad.holdDir = null; return; }
+    const list = navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+    const pads = list.filter(p => p && p.connected);
+    pads.forEach((gp, k) => {
+      let player = 0;
+      if (S.players === 2) player = pads.length === 1 ? 1 : Math.min(k, 1);
+      const st = padState[gp.index] || (padState[gp.index] = { prev: {}, holdDir: null, holdT: 0 });
+      pollPad(gp, st, player, dt);
+    });
+  }
 
+  function pollPad(gp, pad, player, dt) {
     const btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
     const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
     const cur = {
@@ -1723,13 +1858,13 @@
       pause: btn(9),
       mute: btn(8),
     };
-    for (const a in cur) if (cur[a] && !pad.prev[a]) action(a, false);
+    for (const a in cur) if (cur[a] && !pad.prev[a]) action(a, false, player);
 
     // przytrzymanie w lewo/prawo – automatyczne powtarzanie ruchu
     const dir = cur.left ? 'left' : cur.right ? 'right' : null;
     if (dir && dir === pad.holdDir) {
       pad.holdT -= dt;
-      if (pad.holdT <= 0) { action(dir, true); pad.holdT = PAD_REPEAT_RATE; }
+      if (pad.holdT <= 0) { action(dir, true, player); pad.holdT = PAD_REPEAT_RATE; }
     } else {
       pad.holdDir = dir;
       pad.holdT = PAD_REPEAT_DELAY;
@@ -1762,9 +1897,22 @@
   }
 
   function goMenu() {
-    Object.assign(S, { mode: 'menu', customers: [], floats: [], toast: null, bt: newBartender() });
+    Object.assign(S, { mode: 'menu', customers: [], floats: [], toast: null });
+    resetStaff();
     showPanel('panel-menu');
   }
+
+  // ===================== Liczba graczy =====================
+  function selectPlayers(n) {
+    S.players = n === 2 ? 2 : 1;
+    savePlayers(S.players);
+    S.best = loadBest(S.players);
+    resetStaff();
+    document.querySelectorAll('.mode-card').forEach(c => c.setAttribute('aria-checked', String(Number(c.dataset.players) === S.players)));
+    document.querySelectorAll('.best-val').forEach(e => { e.textContent = S.best; });
+    document.querySelectorAll('.only-duo').forEach(e => { e.hidden = S.players !== 2; });
+  }
+  document.querySelectorAll('.mode-card').forEach(card => card.addEventListener('click', () => { selectPlayers(Number(card.dataset.players)); sfx.tick(); }));
 
   // miniatury plansz w kartach wyboru
   function makeThumbs() {
@@ -1781,6 +1929,7 @@
 
   makeThumbs();
   selectTheme(loadTheme());
+  selectPlayers(S.players);
   showPanel('panel-menu');
   requestAnimationFrame(frame);
 })();

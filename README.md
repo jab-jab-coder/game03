@@ -6,6 +6,26 @@ jak najszybciej podać im właściwą butelkę albo piwo z kranu.
 Czysty HTML + CSS + JavaScript (Canvas), **bez zależności i bez budowania**, więc działa
 bezpośrednio na GitHub Pages, a nawet po dwukrotnym kliknięciu `index.html`.
 
+## Tryb dla dwóch graczy
+
+W menu wybierasz **1 gracz** albo **2 graczy** (kliknięciem, strzałkami ↑ ↓ albo padem).
+W trybie 2 graczy za barem stają **barman (P1)** i **barmanka (P2)**. Grają wspólnie: punkty i życia są wspólne,
+a klientów przychodzi więcej i częściej (nowy poziom co 9 obsłużonych).
+
+| | Barman (P1) | Barmanka (P2) |
+|---|---|---|
+| ruch / półka | strzałki | `W` `S` `A` `D` |
+| weź / podaj | `Enter` | `Spacja` lub `F` |
+| odłóż | `Backspace` lub prawy `Shift` | `Q` lub `X` |
+| pad | 1. pad (przy dwóch padach) | 2. pad, albo jedyny podłączony pad |
+
+- Mogą się mijać; w tej samej kolumnie rozsuwają się na boki.
+- Są dwa shakery. Z kranu nalewa naraz tylko jedna osoba.
+- Jednej butelki nie trzymają obie postacie naraz.
+- Rekord trybu dla dwóch graczy zapisuje się osobno.
+
+W trybie 1 gracza oba zestawy klawiszy sterują barmanem.
+
 ## Bary do wyboru
 
 W menu wybierasz planszę (kliknięciem, strzałkami ← → albo padem). Wybór zapamiętuje się w przeglądarce.

@@ -16,6 +16,20 @@
         <section class="panel active" id="panel-menu">
           <h1>Barman</h1>
           <p class="sub">Edycja 1</p>
+          <p class="choose">Liczba graczy <span>(kliknij albo ↑ ↓)</span></p>
+          <div class="modes" role="radiogroup" aria-label="Liczba graczy">
+            <button class="mode-card" data-players="1" role="radio" aria-checked="true">
+              <b>1 gracz</b><span>barman</span>
+            </button>
+            <button class="mode-card" data-players="2" role="radio" aria-checked="false">
+              <b>2 graczy</b><span>barman + barmanka</span>
+            </button>
+          </div>
+          <div class="duo-keys only-duo" hidden>
+            <div><b class="p1">Barman (P1)</b> strzałki · <kbd>Enter</kbd> weź/podaj · <kbd>Backspace</kbd> odłóż</div>
+            <div><b class="p2">Barmanka (P2)</b> <kbd>W</kbd><kbd>S</kbd><kbd>A</kbd><kbd>D</kbd> · <kbd>Spacja</kbd> weź/podaj · <kbd>Q</kbd> odłóż</div>
+            <div class="pads">🎮 dwa pady: 1. barman, 2. barmanka · jeden pad: barmanka</div>
+          </div>
           <p class="choose">Wybierz bar <span>(kliknij albo ← →)</span></p>
           <div class="bars" role="radiogroup" aria-label="Wybór baru">
             <button class="bar-card" data-theme="classic" role="radio" aria-checked="true">
@@ -37,10 +51,12 @@
             <p><b>Whiskey Sour / Rum Sour:</b> weź shaker → lód z wiaderka → whisky albo rum → sweet → sour →
               shake, shake, shake (Spacja ×3) → podaj.</p>
             <table class="keys">
-              <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>ruch za barem</td></tr>
-              <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>wybór półki (górna / środkowa / dolna)</td></tr>
-              <tr><td><kbd>Spacja</kbd></td><td>weź butelkę / nalej piwo / podaj klientowi</td></tr>
-              <tr><td><kbd>X</kbd></td><td>odłóż to, co trzymasz</td></tr>
+              <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd></td><td>ruch za barem</td></tr>
+              <tr><td><kbd>↑</kbd> <kbd>↓</kbd> / <kbd>W</kbd> <kbd>S</kbd></td><td>wybór półki (górna / środkowa / dolna)</td></tr>
+              <tr><td><kbd>Enter</kbd> / <kbd>Spacja</kbd></td><td>weź butelkę / nalej piwo / podaj klientowi</td></tr>
+              <tr><td><kbd>Backspace</kbd> / <kbd>X</kbd> <kbd>Q</kbd></td><td>odłóż to, co trzymasz</td></tr>
+              <tr><td colspan="2" class="note">W trybie 1 gracza oba zestawy klawiszy sterują barmanem. W trybie 2 graczy
+                strzałki + Enter + Backspace to barman, a WSAD + Spacja + Q to barmanka.</td></tr>
               <tr><td><kbd>P</kbd> <kbd>M</kbd></td><td>pauza / dźwięk</td></tr>
               <tr><td>🎮 Gamepad</td><td>krzyżak / gałka – ruch i półka · A – weź / podaj · B / X – odłóż · Start – pauza · Select – dźwięk</td></tr>
             </table>
@@ -73,7 +89,8 @@
       <button data-act="drop">ODŁÓŻ</button>
     </div>
 
-    <p class="help">← → ruch · ↑ ↓ półka · Spacja: weź / podaj · X: odłóż · P: pauza · M: dźwięk</p>
+    <p class="help">Barman: ← → ↑ ↓ · Enter weź/podaj · Backspace odłóż — Barmanka: W S A D · Spacja · Q — P pauza · M dźwięk
+      (w grze solo działają oba zestawy)</p>
   </main>
 
   <script src="js/game.js"></script>
