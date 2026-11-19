@@ -125,3 +125,8 @@ js/game.js      – logika, rysowanie (Canvas) i dźwięki (WebAudio)
 
 Asortyment i rozmieszczenie butelek są zdefiniowane w tablicy `ITEMS` w `js/game.js`.
 Tempo gry ustawia funkcja `params()`.
+
+## Dokumentacja
+
+Specyfikacja techniczna, ocena grywalności, plan wersji 2.0 i plan budowy gry z agentami AI:
+[`docs/SPECYFIKACJA.md`](docs/SPECYFIKACJA.md).
